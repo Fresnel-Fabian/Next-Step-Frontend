@@ -33,7 +33,7 @@ export default function LoginScreen() {
   // Google Sign-In setup
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GoogleAuthConfig.webClientId,
-    // iosClientId: GoogleAuthConfig.iosClientId,
+    iosClientId: GoogleAuthConfig.iosClientId,
     androidClientId: GoogleAuthConfig.androidClientId,
     scopes: GoogleAuthConfig.scopes,
   });
