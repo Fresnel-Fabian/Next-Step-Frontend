@@ -2,20 +2,24 @@ import { DocumentListItem } from '@/components/documents/DocumentListItem';
 import { DataService } from '@/services/dataService';
 import { DocumentItem } from '@/types/document';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
+
 
 export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(0);
@@ -32,8 +36,24 @@ export default function DocumentsScreen() {
       setLoading(true);
       const data = await DataService.getDocuments();
       setDocuments(data);
+      // NEW: Success toast when documents load
+      Toast.show({
+        type: 'success',
+        text1: 'Documents Loaded',
+        text2: `${data.length} documents available`,
+        position: 'top',
+        visibilityTime: 2000,
+      });
     } catch (error) {
       console.error('Failed to fetch documents:', error);
+      // NEW: Error toast when fetch fails
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Load Documents',
+        text2: 'Please check your connection',
+        position: 'top',
+        visibilityTime: 3000,
+      });
     } finally {
       setLoading(false);
     }
@@ -43,9 +63,53 @@ export default function DocumentsScreen() {
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  //  UPDATED: Download with toast notification
   const handleDownload = (doc: DocumentItem) => {
     console.log('Download:', doc.title);
-    // TODO: Implement download
+    
+    Toast.show({
+      type: 'success',
+      text1: 'Download Started',
+      text2: `Downloading ${doc.title}`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    
+    // TODO: Implement actual download
+    // Simulate download completion after 2 seconds
+    setTimeout(() => {
+      Toast.show({
+        type: 'success',
+        text1: 'Download Complete',
+        text2: `${doc.title} saved to your device`,
+        position: 'top',
+        visibilityTime: 2000,
+      });
+    }, 2000);
+  };
+  // NEW: Preview handler with toast
+  const handlePreview = (doc: DocumentItem) => {
+    setPreviewDoc(doc);
+    
+    Toast.show({
+      type: 'info',
+      text1: 'Opening Preview',
+      text2: doc.title,
+      position: 'top',
+      visibilityTime: 1500,
+    });
+  };
+
+  // NEW: Share handler with toast
+  const handleShare = (doc: DocumentItem) => {
+    Toast.show({
+      type: 'success',
+      text1: 'Ready to Share',
+      text2: `${doc.title} can now be shared`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    // TODO: Implement actual share functionality
   };
 
   if (loading) {
@@ -58,10 +122,18 @@ export default function DocumentsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header - UPDATED */}
       <View style={styles.header}>
-        <Text style={styles.title}>Document Center</Text>
-        <Text style={styles.subtitle}>Access and manage important documents</Text>
+        {/*  ADD BACK BUTTON */}
+        <View style={styles.headerTop}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </Pressable>
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>Document Center</Text>
+            <Text style={styles.subtitle}>Access and manage important documents</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -126,7 +198,7 @@ export default function DocumentsScreen() {
             <DocumentListItem
               key={doc.id}
               document={doc}
-              onPreview={() => setPreviewDoc(doc)}
+              onPreview={() => handlePreview(doc)}
               onDownload={() => handleDownload(doc)}
             />
           ))}
@@ -156,10 +228,10 @@ export default function DocumentsScreen() {
                 </View>
               </View>
               <View style={styles.modalHeaderRight}>
-                <Pressable style={styles.modalIconButton}>
+                <Pressable style={styles.modalIconButton} onPress={() => handleDownload(previewDoc)}>
                   <Ionicons name="download-outline" size={20} color="white" />
                 </Pressable>
-                <Pressable style={styles.modalIconButton}>
+                <Pressable style={styles.modalIconButton} onPress={() => handleShare(previewDoc)}>
                   <Ionicons name="share-outline" size={20} color="white" />
                 </Pressable>
                 <Pressable style={styles.modalOpenButton}>
@@ -227,6 +299,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+  },
+  // ADD THESE NEW STYLES
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerContent: {
+    flex: 1,
   },
   title: {
     fontSize: 24,
