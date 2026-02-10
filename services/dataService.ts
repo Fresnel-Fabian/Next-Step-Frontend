@@ -1,14 +1,26 @@
-// Mock data service - replace with real API calls later
+// services/dataService.ts
+/**
+ * Data Service - API calls for all data operations
+ * 
+ * Replaces mock data with real API calls to FastAPI backend
+ */
+
+import api, { handleApiError } from './api';
+
+// ============================================
+// Types - Dashboard
+// ============================================
+
 export interface DashboardStats {
   totalStaff: number;
   staffTrend: string;
   activeSchedules: number;
-  schedulesTrend: string;
+  schedulesTrend?: string;
   notificationsSent: number;
-  notificationsTrend: string;
+  notificationsTrend?: string;
   totalDocuments: number;
-  documentsTrend: string;
-  chartData: Array<{ name: string; active: number }>;
+  documentsTrend?: string;
+  chartData?: Array<{ name: string; active: number }>;
 }
 
 export interface ActivityLog {
@@ -18,302 +30,447 @@ export interface ActivityLog {
   timestamp: string;
 }
 
-export interface StaffScheduleItem {
+// ============================================
+// Types - Schedule
+// ============================================
+
+export interface ScheduleDTO {
   id: string;
-  time: string;
-  title: string;
-  location: string;
-  isStartingSoon: boolean;
+  department: string;
+  classCount: number;
+  staffCount: number;
+  status: string;
+  lastUpdated: string;
 }
-import { DocumentItem } from '@/types/document';
-import { Notification } from '@/types/notification';
-import { ScheduleDTO } from '@/types/schedule';
-import { Poll } from '@/types/poll';
+
+export interface CreateScheduleData {
+  department: string;
+  class_count: number;
+  staff_count: number;
+  status?: string;
+}
+
+export interface UpdateScheduleData {
+  department?: string;
+  class_count?: number;
+  staff_count?: number;
+  status?: string;
+}
+
+// ============================================
+// Types - Document
+// ============================================
+
+export interface DocumentItem {
+  id: string;
+  title: string;
+  category: string;
+  description?: string;
+  fileUrl: string;
+  fileSize: number;
+  uploadedBy: number;
+  createdAt: string;
+  // Frontend display fields (computed)
+  type?: string;
+  size?: string;
+  author?: string;
+  date?: string;
+  access?: string;
+}
+
+export interface CreateDocumentData {
+  title: string;
+  category: string;
+  description?: string;
+  file_url: string;
+  file_size: number;
+}
+
+// ============================================
+// Types - Poll
+// ============================================
+
+export interface PollOption {
+  id: number;
+  text: string;
+  votes: number;
+  percentage: number;
+}
+
+export interface Poll {
+  id: number;
+  title: string;
+  description?: string;
+  options: PollOption[];
+  isActive: boolean;
+  totalVotes: number;
+  createdAt: string;
+  expiresAt?: string;
+  // Frontend display fields
+  question?: string;
+  creator?: string;
+  timeLeft?: string;
+  status?: 'active' | 'completed';
+  voted?: boolean;
+}
+
+export interface CreatePollData {
+  title: string;
+  description?: string;
+  options: Array<{ id: number; text: string }>;
+  expires_at?: string;
+}
+
+// ============================================
+// Types - Notification
+// ============================================
+
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  isRead: boolean;
+  createdAt: string;
+  // Frontend display fields
+  sender?: string;
+  time?: string;
+  read?: boolean;
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+// Format date to relative time (e.g., "2 hours ago")
+const formatRelativeTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString();
+};
+
+// Format file size (bytes to human readable)
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// ============================================
+// Data Service Class
+// ============================================
 
 export class DataService {
-  // Admin dashboard stats
+  // ========================================
+  // Dashboard
+  // ========================================
+  
   static async getDashboardStats(): Promise<DashboardStats> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return {
-      totalStaff: 156,
-      staffTrend: '+12 this month',
-      activeSchedules: 12,
-      schedulesTrend: '3 updated today',
-      notificationsSent: 48,
-      notificationsTrend: 'this week',
-      totalDocuments: 284,
-      documentsTrend: '48 added recently',
-      chartData: [
-        { name: 'Mon', active: 12 },
-        { name: 'Tue', active: 19 },
-        { name: 'Wed', active: 15 },
-        { name: 'Thu', active: 22 },
-        { name: 'Fri', active: 18 },
-      ],
-    };
+    try {
+      const response = await api.get<DashboardStats>('/api/v1/dashboard/stats');
+      return {
+        ...response.data,
+        // Add default trends if not provided by backend
+        schedulesTrend: response.data.schedulesTrend || 'Updated recently',
+        notificationsTrend: response.data.notificationsTrend || 'this week',
+        documentsTrend: response.data.documentsTrend || 'added recently',
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
 
-  // Recent activity feed
-  static async getRecentActivity(): Promise<ActivityLog[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return [
-      {
-        id: '1',
-        title: 'Schedule created',
-        author: 'Math Department',
-        timestamp: '2 hours ago',
-      },
-      {
-        id: '2',
-        title: 'Emergency alert sent',
-        author: 'Principal Office',
-        timestamp: '5 hours ago',
-      },
-      {
-        id: '3',
-        title: 'Document uploaded',
-        author: 'HR Department',
-        timestamp: '1 day ago',
-      },
-    ];
+  static async getRecentActivity(limit: number = 20): Promise<ActivityLog[]> {
+    try {
+      const response = await api.get<ActivityLog[]>('/api/v1/dashboard/activity', {
+        params: { limit },
+      });
+      
+      // Format timestamps for display
+      return response.data.map(activity => ({
+        ...activity,
+        id: String(activity.id),
+        timestamp: formatRelativeTime(activity.timestamp),
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
 
-  // Staff's today schedule
-  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return [
-      {
-        id: '1',
-        time: '08:00 AM',
-        title: 'Mathematics 101',
-        location: 'Room 204',
-        isStartingSoon: true,
-      },
-      {
-        id: '2',
-        time: '10:00 AM',
-        title: 'Staff Meeting',
-        location: 'Conference Hall',
-        isStartingSoon: true,
-      },
-      {
-        id: '3',
-        time: '02:00 PM',
-        title: 'Physics Lab',
-        location: 'Lab 3',
-        isStartingSoon: false,
-      },
-    ];
+  // ========================================
+  // Schedules
+  // ========================================
+
+  static async getSchedules(search?: string, status?: string): Promise<ScheduleDTO[]> {
+    try {
+      const response = await api.get<ScheduleDTO[]>('/api/v1/schedules', {
+        params: { search, status },
+      });
+      
+      // Format for frontend display
+      return response.data.map(schedule => ({
+        ...schedule,
+        id: String(schedule.id),
+        lastUpdated: formatRelativeTime(schedule.lastUpdated),
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
-  // Documents list
-  static async getDocuments(): Promise<DocumentItem[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return [
-      {
-        id: '1',
-        title: 'Staff Handbook 2025',
-        category: 'Handbooks',
-        type: 'PDF',
-        size: '2.4 MB',
-        author: 'HR Department',
-        date: '2 days ago',
-        access: 'All Staff',
-      },
-      {
-        id: '2',
-        title: 'Emergency Procedures',
-        category: 'Policies',
-        type: 'PDF',
-        size: '1.8 MB',
-        author: 'Administration',
-        date: '1 week ago',
-        access: 'All Staff',
-      },
-      {
-        id: '3',
-        title: 'Curriculum Planning Template',
-        category: 'Forms',
-        type: 'DOC',
-        size: '245 KB',
-        author: 'Principal Office',
-        date: '3 days ago',
-        access: 'Teachers Only',
-      },
-      {
-        id: '4',
-        title: 'Grade Report Template',
-        category: 'Resources',
-        type: 'XLS',
-        size: '180 KB',
-        author: 'Academic Office',
-        date: '5 days ago',
-        access: 'All Staff',
-      },
-    ];
+
+  static async getSchedule(id: string): Promise<ScheduleDTO> {
+    try {
+      const response = await api.get<ScheduleDTO>(`/api/v1/schedules/${id}`);
+      return {
+        ...response.data,
+        id: String(response.data.id),
+        lastUpdated: formatRelativeTime(response.data.lastUpdated),
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
-  // Schedules list
-  static async getSchedules(): Promise<ScheduleDTO[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return [
-      {
-        id: '1',
-        department: 'Mathematics Department',
-        status: 'Active',
-        classCount: 12,
-        staffCount: 8,
-        lastUpdated: '2 hours ago',
-      },
-      {
-        id: '2',
-        department: 'Science Department',
-        status: 'Active',
-        classCount: 15,
-        staffCount: 10,
-        lastUpdated: '1 day ago',
-      },
-      {
-        id: '3',
-        department: 'English Department',
-        status: 'Active',
-        classCount: 18,
-        staffCount: 12,
-        lastUpdated: '3 days ago',
-      },
-      {
-        id: '4',
-        department: 'History Department',
-        status: 'Draft',
-        classCount: 8,
-        staffCount: 5,
-        lastUpdated: '1 week ago',
-      },
-    ];
+
+  static async createSchedule(data: CreateScheduleData): Promise<ScheduleDTO> {
+    try {
+      const response = await api.post<ScheduleDTO>('/api/v1/schedules', data);
+      return {
+        ...response.data,
+        id: String(response.data.id),
+        lastUpdated: formatRelativeTime(response.data.lastUpdated),
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async updateSchedule(id: string, data: UpdateScheduleData): Promise<ScheduleDTO> {
+    try {
+      const response = await api.put<ScheduleDTO>(`/api/v1/schedules/${id}`, data);
+      return {
+        ...response.data,
+        id: String(response.data.id),
+        lastUpdated: formatRelativeTime(response.data.lastUpdated),
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
 
   static async deleteSchedule(id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log('Deleted schedule:', id);
+    try {
+      await api.delete(`/api/v1/schedules/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
-  // Notifications list
-  static async getNotifications(): Promise<Notification[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return [
-      {
-        id: '1',
-        type: 'emergency',
-        title: 'Emergency Drill Scheduled',
-        message: 'Fire drill will take place tomorrow at 10:00 AM. Please prepare your students.',
-        sender: 'Safety Officer',
-        time: '1 hour ago',
-        read: false,
-      },
-      {
-        id: '2',
-        type: 'document',
-        title: 'New Document: Safety Guidelines',
-        message: 'Updated safety guidelines for 2025 have been uploaded to the document center.',
-        sender: 'Administration',
-        time: '3 hours ago',
-        read: false,
-      },
-      {
-        id: '3',
-        type: 'schedule',
-        title: 'Schedule Update: Math Department',
-        message: 'Your Tuesday schedule has been updated. Please check for changes.',
-        sender: 'Department Head',
-        time: '5 hours ago',
-        read: true,
-      },
-      {
-        id: '4',
-        type: 'general',
-        title: 'Staff Meeting Reminder',
-        message: 'Monthly staff meeting is scheduled for Friday at 3:00 PM in the main hall.',
-        sender: 'Principal Office',
-        time: '1 day ago',
-        read: true,
-      },
-      {
-        id: '5',
-        type: 'document',
-        title: 'Policy Update',
-        message: 'Attendance policy has been revised. Please review the updated document.',
-        sender: 'HR Department',
-        time: '2 days ago',
-        read: true,
-      },
-    ];
+
+  // ========================================
+  // Documents
+  // ========================================
+
+  static async getDocuments(category?: string, search?: string): Promise<DocumentItem[]> {
+    try {
+      const response = await api.get<DocumentItem[]>('/api/v1/documents', {
+        params: { category, search },
+      });
+      
+      // Format for frontend display
+      return response.data.map(doc => ({
+        ...doc,
+        id: String(doc.id),
+        size: formatFileSize(doc.fileSize),
+        date: formatRelativeTime(doc.createdAt),
+        type: doc.fileUrl.split('.').pop()?.toUpperCase() || 'FILE',
+        access: 'All Staff', // Default, adjust based on your needs
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
-  // Polls list
-  static async getPolls(): Promise<Poll[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return [
-      {
-        id: '1',
-        question: 'What would you prefer for Friday lunch?',
-        options: [
-          { label: 'Pizza', votes: 128, percentage: 45 },
-          { label: 'Salad Bar', votes: 89, percentage: 31 },
-          { label: 'Pasta', votes: 68, percentage: 24 },
-        ],
-        creator: 'Cafeteria Manager',
-        timeLeft: '2 days left',
-        totalVotes: 285,
-        status: 'active',
-        voted: true,
-      },
-      {
-        id: '2',
-        question: 'Best time for staff meeting next week?',
-        options: [
-          { label: 'Monday 3 PM', votes: 45, percentage: 35 },
-          { label: 'Wednesday 2 PM', votes: 60, percentage: 47 },
-          { label: 'Friday 4 PM', votes: 23, percentage: 18 },
-        ],
-        creator: 'Principal Office',
-        timeLeft: '5 days left',
-        totalVotes: 128,
-        status: 'active',
-        voted: false,
-      },
-      {
-        id: '3',
-        question: 'Preferred professional development topic?',
-        options: [
-          { label: 'Technology Integration', votes: 92, percentage: 55 },
-          { label: 'Classroom Management', votes: 45, percentage: 27 },
-          { label: 'Student Engagement', votes: 30, percentage: 18 },
-        ],
-        creator: 'HR Department',
-        timeLeft: 'Ended 3 days ago',
-        totalVotes: 167,
-        status: 'completed',
-        voted: true,
-      },
-      {
-        id: '4',
-        question: 'School field trip destination?',
-        options: [
-          { label: 'Science Museum', votes: 78, percentage: 48 },
-          { label: 'Art Gallery', votes: 52, percentage: 32 },
-          { label: 'Historical Site', votes: 33, percentage: 20 },
-        ],
-        creator: 'Activities Coordinator',
-        timeLeft: 'Ended 1 week ago',
-        totalVotes: 163,
-        status: 'completed',
-        voted: true,
-      },
-    ];
+
+  static async getDocument(id: string): Promise<DocumentItem> {
+    try {
+      const response = await api.get<DocumentItem>(`/api/v1/documents/${id}`);
+      return {
+        ...response.data,
+        id: String(response.data.id),
+        size: formatFileSize(response.data.fileSize),
+        date: formatRelativeTime(response.data.createdAt),
+        type: response.data.fileUrl.split('.').pop()?.toUpperCase() || 'FILE',
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async createDocument(data: CreateDocumentData): Promise<DocumentItem> {
+    try {
+      const response = await api.post<DocumentItem>('/api/v1/documents', data);
+      return {
+        ...response.data,
+        id: String(response.data.id),
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async deleteDocument(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/v1/documents/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  // ========================================
+  // Polls
+  // ========================================
+
+  static async getPolls(status?: 'active' | 'completed'): Promise<Poll[]> {
+    try {
+      const response = await api.get<Poll[]>('/api/v1/polls', {
+        params: { status },
+      });
+      
+      // Format for frontend display
+      return response.data.map(poll => ({
+        ...poll,
+        question: poll.title,
+        status: poll.isActive ? 'active' : 'completed',
+        timeLeft: poll.expiresAt 
+          ? (new Date(poll.expiresAt) > new Date() 
+            ? `Ends ${formatRelativeTime(poll.expiresAt).replace(' ago', '')}`
+            : `Ended ${formatRelativeTime(poll.expiresAt)}`)
+          : (poll.isActive ? 'No expiry' : 'Ended'),
+        creator: 'Administrator', // Backend doesn't return this, you could add it
+        voted: false, // You'd need to track this per-user
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getPoll(id: number): Promise<Poll> {
+    try {
+      const response = await api.get<Poll>(`/api/v1/polls/${id}`);
+      return {
+        ...response.data,
+        question: response.data.title,
+        status: response.data.isActive ? 'active' : 'completed',
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async createPoll(data: CreatePollData): Promise<Poll> {
+    try {
+      const response = await api.post<Poll>('/api/v1/polls', data);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async votePoll(pollId: number, optionId: number): Promise<void> {
+    try {
+      await api.post(`/api/v1/polls/${pollId}/vote`, {
+        option_id: optionId,
+      });
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async closePoll(pollId: number): Promise<void> {
+    try {
+      await api.patch(`/api/v1/polls/${pollId}/close`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  // ========================================
+  // Notifications
+  // ========================================
+
+  static async getNotifications(unreadOnly: boolean = false): Promise<Notification[]> {
+    try {
+      const response = await api.get<Notification[]>('/api/v1/notifications', {
+        params: { unread_only: unreadOnly },
+      });
+      
+      // Format for frontend display
+      return response.data.map(notif => ({
+        ...notif,
+        time: formatRelativeTime(notif.createdAt),
+        read: notif.isRead,
+        sender: 'System', // Backend doesn't track sender, you could add it
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getUnreadCount(): Promise<number> {
+    try {
+      const response = await api.get<{ unreadCount: number }>('/api/v1/notifications/unread-count');
+      return response.data.unreadCount;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async markNotificationRead(id: number): Promise<void> {
+    try {
+      await api.patch(`/api/v1/notifications/${id}/read`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async markAllNotificationsRead(): Promise<void> {
+    try {
+      await api.patch('/api/v1/notifications/read-all');
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  // ========================================
+  // Users (Admin)
+  // ========================================
+
+  static async getUsers(department?: string): Promise<any[]> {
+    try {
+      const response = await api.get('/api/v1/users', {
+        params: { department },
+      });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getUser(id: string): Promise<any> {
+    try {
+      const response = await api.get(`/api/v1/users/${id}`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   }
 }
 
+export default DataService;
