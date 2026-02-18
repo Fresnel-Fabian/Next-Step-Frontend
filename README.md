@@ -444,7 +444,7 @@ npx expo run:ios
 |------|-------|----------|--------|
 | Admin | `admin@test.com` | Any | Full admin dashboard |
 | Staff | `staff@test.com` | Any | Staff dashboard |
-| Staff | `teacher@school.edu` | Any | Staff dashboard |
+| Student | `student@school.edu` | Any | Student dashboard |
 
 ### Run Tests (Future)
 
