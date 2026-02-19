@@ -442,9 +442,9 @@ npx expo run:ios
 
 | Role | Email | Password | Access |
 |------|-------|----------|--------|
-| Admin | `admin@test.com` | Any | Full admin dashboard |
-| Staff | `staff@test.com` | Any | Staff dashboard |
-| Staff | `teacher@school.edu` | Any | Staff dashboard |
+| Admin | `admin@school.edu` | adminpass123 | Full admin dashboard |
+| Teacher | `teacher@school.edu` | teacherpass123 | Teacher dashboard |
+| Student | `student@school.edu` | studentpass123 | Student dashboard |
 
 ### Run Tests (Future)
 
