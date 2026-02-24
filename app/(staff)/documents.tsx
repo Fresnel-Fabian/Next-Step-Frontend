@@ -14,12 +14,10 @@ import {
   View,
 } from "react-native";
 
-const CATEGORIES: { label: string; value: DocumentCategory; icon: string }[] = [
-  { label: "All", value: "all", icon: "grid-outline" },
-  { label: "Policies", value: "policies", icon: "shield-checkmark-outline" },
-  { label: "Forms", value: "forms", icon: "create-outline" },
-  { label: "Handbooks", value: "handbooks", icon: "book-outline" },
-  { label: "Resources", value: "resources", icon: "folder-outline" },
+const CATEGORIES: { label: string; value: DocumentCategory }[] = [
+  { label: "All", value: "all" },
+  { label: "Recent", value: "recent" },
+  { label: "Shared with me", value: "shared with me" },
 ];
 
 export default function StaffDocuments() {
@@ -67,12 +65,10 @@ export default function StaffDocuments() {
   };
 
   const handlePreview = (doc: DocumentItem) => {
-    // Phase 2: expo-web-browser
     Alert.alert("Preview", `Opening: ${doc.title}`);
   };
 
   const handleDownload = (doc: DocumentItem) => {
-    // Phase 2: expo-file-system + expo-sharing
     Alert.alert("Download", `Downloading: ${doc.title}`);
   };
 
@@ -127,11 +123,7 @@ export default function StaffDocuments() {
               ]}
               onPress={() => setSelectedCategory(item.value)}
             >
-              <Ionicons
-                name={item.icon as any}
-                size={14}
-                color={isActive ? "white" : "#6B7280"}
-              />
+              <Ionicons size={14} color={isActive ? "white" : "#6B7280"} />
               <Text
                 style={[
                   styles.categoryChipText,

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from "@/store/authStore";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { useEffect } from "react";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -16,19 +16,19 @@ export default function RootLayout() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inAdminGroup = segments[0] === '(admin)';
-    const inStaffGroup = segments[0] === '(staff)';
+    const inAuthGroup = segments[0] === "(auth)";
+    const inAdminGroup = segments[0] === "(admin)";
+    const inStaffGroup = segments[0] === "(staff)";
 
     if (!user && !inAuthGroup) {
       // Not logged in → go to login
-      router.replace('/(auth)/login');
+      router.replace("/(auth)/login");
     } else if (user && inAuthGroup) {
       // Logged in but on auth screen → redirect to appropriate dashboard
-      if (user.role === 'admin') {
-        router.replace('/(admin)/dashboard');
+      if (user.role === "ADMIN") {
+        router.replace("/(admin)/dashboard");
       } else {
-        router.replace('/(staff)/dashboard');
+        router.replace("/(staff)/dashboard");
       }
     }
   }, [user, segments, isLoading]);

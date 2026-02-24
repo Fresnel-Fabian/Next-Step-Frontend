@@ -158,7 +158,7 @@ interface RawDocumentItem {
   id: string | number;
   title: string;
   category: string;
-  description?: string;
+  description: string;
   url: string;
   fileSize: number;
   uploadedBy: number;
@@ -171,6 +171,7 @@ const mapDocument = (doc: RawDocumentItem): DocumentItem => ({
   id: String(doc.id),
   title: doc.title,
   category: doc.category,
+  description: doc.description,
   type: inferFileType(doc.url),
   size: formatFileSize(doc.fileSize),
   author: doc.uploadedByName || `User #${doc.uploadedBy}`,

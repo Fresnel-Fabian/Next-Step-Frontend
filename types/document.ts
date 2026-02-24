@@ -1,14 +1,10 @@
-export type DocumentCategory =
-  | "all"
-  | "policies"
-  | "forms"
-  | "handbooks"
-  | "resources";
+export type DocumentCategory = "all" | "recent" | "shared with me";
 
 export interface DocumentItem {
   id: string;
   title: string;
   category: string;
+  description?: string;
   type: "PDF" | "DOC" | "XLS" | "FILE";
   size: string;
   author: string;
