@@ -207,8 +207,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ user: response.data, isLoading: false });
     } catch (error) {
       // Token is invalid or expired
-      await clearAuthToken();
-      await AsyncStorage.multiRemove([USER_KEY, GOOGLE_ACCESS_TOKEN_KEY]);
       set({ user: null, isLoading: false });
     }
   },

@@ -58,9 +58,7 @@ export default function StaffDocuments() {
           text || undefined,
         );
         setDocuments(data);
-      } catch {
-        // silently fail
-      }
+      } catch {}
     }
   };
 

@@ -72,7 +72,7 @@ export default function LoginScreen() {
       const userData = await userInfoResponse.json();
 
       // Login with Google user data
-      await loginWithGoogle(idToken, userData);
+      await loginWithGoogle(idToken, userData, accessToken);
 
       // Navigation happens automatically via root layout
     } catch (err) {
