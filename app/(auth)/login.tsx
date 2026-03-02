@@ -1,6 +1,16 @@
+/**
+ * Login Screen for the app
+ * - Supports email/password login and Google Sign-In
+ * - Uses Expo Auth Session for Google authentication
+ *
+ * @see https://docs.expo.dev/versions/latest/sdk/auth-session/
+ * @see https://docs.expo.dev/guides/authentication/
+ * @see https://developers.google.com/identity/protocols/oauth2/web-server#node.js
+ */
 import { GoogleAuthConfig } from "@/config/google-auth";
 import { useAuthStore } from "@/store/authStore";
 import { Ionicons } from "@expo/vector-icons";
+import { ResponseType } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -35,14 +45,18 @@ export default function LoginScreen() {
     webClientId: GoogleAuthConfig.webClientId,
     iosClientId: GoogleAuthConfig.iosClientId,
     androidClientId: GoogleAuthConfig.androidClientId,
-    scopes: GoogleAuthConfig.scopes,
+    scopes: ["openid", "email", "profile"], // IdToken flow only allows a subset of [openid, email, profile]
+    responseType: ResponseType.IdToken,
   });
 
   // Handle Google auth response
   useEffect(() => {
     if (response?.type === "success") {
-      const { authentication } = response;
-      handleGoogleSuccess(authentication?.idToken, authentication?.accessToken);
+      const { authentication, params } = response as any;
+      const idToken = params?.id_token ?? authentication?.idToken;
+      const accessToken = params?.access_token ?? authentication?.accessToken;
+
+      handleGoogleSuccess(idToken, accessToken);
     } else if (response?.type === "error") {
       setError("Google sign-in failed. Please try again.");
       setIsLoading(false);
@@ -55,7 +69,9 @@ export default function LoginScreen() {
     idToken?: string,
     accessToken?: string,
   ) => {
-    if (!idToken) {
+    const tokenToSend = idToken || accessToken;
+
+    if (!tokenToSend) {
       setError("Failed to get authentication token");
       setIsLoading(false);
       return;
@@ -71,8 +87,8 @@ export default function LoginScreen() {
       );
       const userData = await userInfoResponse.json();
 
-      // Login with Google user data
-      await loginWithGoogle(idToken, userData, accessToken);
+      // Login with Google — send idToken to backend for verification
+      await loginWithGoogle(tokenToSend, userData, accessToken);
 
       // Navigation happens automatically via root layout
     } catch (err) {
