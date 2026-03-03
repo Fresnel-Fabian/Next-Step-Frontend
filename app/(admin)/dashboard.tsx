@@ -1,19 +1,23 @@
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import { ActivityItem } from "@/components/dashboard/ActivityItem";
+import { StatsCard } from "@/components/dashboard/StatsCard";
+import {
+  ActivityLog,
+  DashboardStats,
+  DataService,
+} from "@/services/dataService";
+import { useAuthStore } from "@/store/authStore";
+import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
+import {
   ActivityIndicator,
-  Pressable,
   Dimensions,
-} from 'react-native';
-import { useState, useEffect } from 'react';
-import { useAuthStore } from '@/store/authStore';
-import { DataService, DashboardStats, ActivityLog } from '@/services/dataService';
-import { StatsCard } from '@/components/dashboard/StatsCard';
-import { ActivityItem } from '@/components/dashboard/ActivityItem';
-import { BarChart } from 'react-native-chart-kit';
-import { Ionicons } from '@expo/vector-icons';
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { BarChart } from "react-native-chart-kit";
 
 export default function AdminDashboard() {
   const { user, logout } = useAuthStore();
@@ -35,7 +39,7 @@ export default function AdminDashboard() {
       setStats(statsData);
       setActivities(activityData);
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      console.error("Failed to fetch dashboard data:", error);
     } finally {
       setLoading(false);
     }
@@ -122,12 +126,14 @@ export default function AdminDashboard() {
           {/* Documents Card */}
           <Pressable style={styles.actionCard}>
             <View style={styles.actionHeader}>
-              <View style={[styles.actionIcon, { backgroundColor: '#D1FAE5' }]}>
+              <View style={[styles.actionIcon, { backgroundColor: "#D1FAE5" }]}>
                 <Ionicons name="document-text" size={24} color="#10B981" />
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Documents</Text>
-                <Text style={styles.actionSubtitle}>48 files pending review</Text>
+                <Text style={styles.actionSubtitle}>
+                  48 files pending review
+                </Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -137,7 +143,9 @@ export default function AdminDashboard() {
           <View style={styles.analyticsCard}>
             <View style={styles.analyticsHeader}>
               <View style={styles.actionHeader}>
-                <View style={[styles.actionIcon, { backgroundColor: '#FED7AA' }]}>
+                <View
+                  style={[styles.actionIcon, { backgroundColor: "#FED7AA" }]}
+                >
                   <Ionicons name="bar-chart" size={24} color="#F59E0B" />
                 </View>
                 <View style={styles.actionText}>
@@ -149,36 +157,47 @@ export default function AdminDashboard() {
 
             {/* NEW Chart - react-native-chart-kit */}
             <View style={styles.chartContainer}>
-              <BarChart
-                data={{
-                  labels: stats.chartData.map(d => d.name),
-                  datasets: [{
-                    data: stats.chartData.map(d => d.active),
-                  }],
-                }}
-                width={Dimensions.get('window').width - 80}
-                height={160}
-                yAxisLabel=""
-                yAxisSuffix=""
-                chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                  style: {
+              {stats.chartData && stats.chartData.length > 0 ? (
+                <BarChart
+                  data={{
+                    labels: (stats.chartData ?? []).map((d) => d.name),
+                    datasets: [
+                      {
+                        data: (stats.chartData ?? []).map((d) => d.active),
+                      },
+                    ],
+                  }}
+                  width={Dimensions.get("window").width - 80}
+                  height={160}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  chartConfig={{
+                    backgroundColor: "#ffffff",
+                    backgroundGradientFrom: "#ffffff",
+                    backgroundGradientTo: "#ffffff",
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
+                    labelColor: (opacity = 1) =>
+                      `rgba(107, 114, 128, ${opacity})`,
+                    style: {
+                      borderRadius: 16,
+                    },
+                    barPercentage: 0.5,
+                  }}
+                  style={{
+                    marginVertical: 8,
                     borderRadius: 16,
-                  },
-                  barPercentage: 0.5,
-                }}
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                }}
-                showValuesOnTopOfBars
-                withInnerLines={false}
-              />
+                  }}
+                  showValuesOnTopOfBars
+                  withInnerLines={false}
+                />
+              ) : (
+                <View style={styles.chartEmpty}>
+                  <Text style={styles.chartEmptyText}>
+                    No activity data yet
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -210,32 +229,32 @@ export default function AdminDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
   content: {
     padding: 16,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 24,
   },
   greeting: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: "bold",
+    color: "#111827",
     marginBottom: 4,
   },
   subGreeting: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   logoutButton: {
     padding: 8,
@@ -244,7 +263,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 12,
   },
@@ -258,51 +277,51 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   actionCard: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
+    borderColor: "#F3F4F6",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
   actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 16,
   },
   actionIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   actionText: {
     gap: 2,
   },
   actionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: "bold",
+    color: "#111827",
   },
   actionSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   analyticsCard: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
+    borderColor: "#F3F4F6",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -314,35 +333,44 @@ const styles = StyleSheet.create({
   chartContainer: {
     height: 180,
     marginTop: 8,
-    alignItems: 'center',
+    alignItems: "center",
+  },
+  chartEmpty: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  chartEmptyText: {
+    fontSize: 14,
+    color: "#9CA3AF",
   },
   activityCard: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
+    borderColor: "#F3F4F6",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
   activityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   activityTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: "bold",
+    color: "#111827",
   },
   viewAllButton: {
     fontSize: 12,
-    color: '#2563EB',
-    fontWeight: '600',
+    color: "#2563EB",
+    fontWeight: "600",
   },
   activityList: {
     gap: 0,

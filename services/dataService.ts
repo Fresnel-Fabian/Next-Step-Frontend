@@ -1,26 +1,24 @@
 // services/dataService.ts
 /**
- * Data Service - API calls for all data operations
- * 
- * Replaces mock data with real API calls to FastAPI backend
+ * Data Service — API calls for all data operations.
+ *
+ * Drive-related methods call backend endpoints which in turn
+ * call the Google Drive API. The frontend never calls Drive directly
+ * except for the Picker UI.
  */
 
-import api, { handleApiError } from './api';
-
-// ============================================
-// Types - Dashboard
-// ============================================
+import api, { handleApiError } from "./api";
 
 export interface DashboardStats {
   totalStaff: number;
   staffTrend: string;
   activeSchedules: number;
-  schedulesTrend?: string;
+  schedulesTrend: string;
   notificationsSent: number;
-  notificationsTrend?: string;
+  notificationsTrend: string;
   totalDocuments: number;
-  documentsTrend?: string;
-  chartData?: Array<{ name: string; active: number }>;
+  documentsTrend: string;
+  chartData: Array<{ name: string; active: number }>;
 }
 
 export interface ActivityLog {
@@ -29,10 +27,6 @@ export interface ActivityLog {
   author: string;
   timestamp: string;
 }
-
-// ============================================
-// Types - Schedule
-// ============================================
 
 export interface ScheduleDTO {
   id: string;
@@ -57,10 +51,6 @@ export interface UpdateScheduleData {
   status?: string;
 }
 
-// ============================================
-// Types - Document
-// ============================================
-
 export interface DocumentItem {
   id: string;
   title: string;
@@ -70,10 +60,16 @@ export interface DocumentItem {
   fileSize: number;
   uploadedBy: number;
   createdAt: string;
-  // Frontend display fields (computed)
+  // Google Drive fields — null for non-Drive documents
+  // See: https://developers.google.com/workspace/drive/api/reference/rest/v3/files
+  driveFileId?: string; // Files resource `id`
+  webViewLink?: string; // Files resource `webViewLink`
+  mimeType?: string; // Files resource `mimeType`
+  isSharedWithMe?: boolean;
+  driveOwnerEmail?: string;
+  // Frontend display fields (computed locally)
   type?: string;
   size?: string;
-  author?: string;
   date?: string;
   access?: string;
 }
@@ -86,9 +82,14 @@ export interface CreateDocumentData {
   file_size: number;
 }
 
-// ============================================
-// Types - Poll
-// ============================================
+export interface CreateDriveDocumentData {
+  title: string;
+  category: string;
+  description?: string;
+  drive_file_id: string;
+  web_view_link: string;
+  mime_type: string;
+}
 
 export interface PollOption {
   id: number;
@@ -106,11 +107,10 @@ export interface Poll {
   totalVotes: number;
   createdAt: string;
   expiresAt?: string;
-  // Frontend display fields
   question?: string;
   creator?: string;
   timeLeft?: string;
-  status?: 'active' | 'completed';
+  status?: "active" | "completed";
   voted?: boolean;
 }
 
@@ -121,18 +121,13 @@ export interface CreatePollData {
   expires_at?: string;
 }
 
-// ============================================
-// Types - Notification
-// ============================================
-
 export interface Notification {
   id: number;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: "info" | "success" | "warning" | "error";
   isRead: boolean;
   createdAt: string;
-  // Frontend display fields
   sender?: string;
   time?: string;
   read?: boolean;
@@ -142,7 +137,6 @@ export interface Notification {
 // Helper Functions
 // ============================================
 
-// Format date to relative time (e.g., "2 hours ago")
 const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
@@ -150,39 +144,29 @@ const formatRelativeTime = (dateString: string): string => {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
-  
-  if (diffMins < 1) return 'Just now';
+
+  if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins} minutes ago`;
   if (diffHours < 24) return `${diffHours} hours ago`;
   if (diffDays < 7) return `${diffDays} days ago`;
   return date.toLocaleDateString();
 };
 
-// Format file size (bytes to human readable)
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-// ============================================
-// Data Service Class
-// ============================================
-
 export class DataService {
-  // ========================================
-  // Dashboard
-  // ========================================
-  
   static async getDashboardStats(): Promise<DashboardStats> {
     try {
-      const response = await api.get<DashboardStats>('/api/v1/dashboard/stats');
+      const response = await api.get<DashboardStats>("/api/v1/dashboard/stats");
       return {
         ...response.data,
-        // Add default trends if not provided by backend
-        schedulesTrend: response.data.schedulesTrend || 'Updated recently',
-        notificationsTrend: response.data.notificationsTrend || 'this week',
-        documentsTrend: response.data.documentsTrend || 'added recently',
+        schedulesTrend: response.data.schedulesTrend || "Updated recently",
+        notificationsTrend: response.data.notificationsTrend || "this week",
+        documentsTrend: response.data.documentsTrend || "added recently",
       };
     } catch (error) {
       throw handleApiError(error);
@@ -191,12 +175,13 @@ export class DataService {
 
   static async getRecentActivity(limit: number = 20): Promise<ActivityLog[]> {
     try {
-      const response = await api.get<ActivityLog[]>('/api/v1/dashboard/activity', {
-        params: { limit },
-      });
-      
-      // Format timestamps for display
-      return response.data.map(activity => ({
+      const response = await api.get<ActivityLog[]>(
+        "/api/v1/dashboard/activity",
+        {
+          params: { limit },
+        },
+      );
+      return response.data.map((activity) => ({
         ...activity,
         id: String(activity.id),
         timestamp: formatRelativeTime(activity.timestamp),
@@ -206,18 +191,15 @@ export class DataService {
     }
   }
 
-  // ========================================
-  // Schedules
-  // ========================================
-
-  static async getSchedules(search?: string, status?: string): Promise<ScheduleDTO[]> {
+  static async getSchedules(
+    search?: string,
+    status?: string,
+  ): Promise<ScheduleDTO[]> {
     try {
-      const response = await api.get<ScheduleDTO[]>('/api/v1/schedules', {
+      const response = await api.get<ScheduleDTO[]>("/api/v1/schedules", {
         params: { search, status },
       });
-      
-      // Format for frontend display
-      return response.data.map(schedule => ({
+      return response.data.map((schedule) => ({
         ...schedule,
         id: String(schedule.id),
         lastUpdated: formatRelativeTime(schedule.lastUpdated),
@@ -227,22 +209,9 @@ export class DataService {
     }
   }
 
-  static async getSchedule(id: string): Promise<ScheduleDTO> {
-    try {
-      const response = await api.get<ScheduleDTO>(`/api/v1/schedules/${id}`);
-      return {
-        ...response.data,
-        id: String(response.data.id),
-        lastUpdated: formatRelativeTime(response.data.lastUpdated),
-      };
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  }
-
   static async createSchedule(data: CreateScheduleData): Promise<ScheduleDTO> {
     try {
-      const response = await api.post<ScheduleDTO>('/api/v1/schedules', data);
+      const response = await api.post<ScheduleDTO>("/api/v1/schedules", data);
       return {
         ...response.data,
         id: String(response.data.id),
@@ -253,9 +222,15 @@ export class DataService {
     }
   }
 
-  static async updateSchedule(id: string, data: UpdateScheduleData): Promise<ScheduleDTO> {
+  static async updateSchedule(
+    id: string,
+    data: UpdateScheduleData,
+  ): Promise<ScheduleDTO> {
     try {
-      const response = await api.put<ScheduleDTO>(`/api/v1/schedules/${id}`, data);
+      const response = await api.put<ScheduleDTO>(
+        `/api/v1/schedules/${id}`,
+        data,
+      );
       return {
         ...response.data,
         id: String(response.data.id),
@@ -273,25 +248,23 @@ export class DataService {
       throw handleApiError(error);
     }
   }
-
-  // ========================================
-  // Documents
-  // ========================================
-
-  static async getDocuments(category?: string, search?: string): Promise<DocumentItem[]> {
+  static async getDocuments(
+    category?: string,
+    search?: string,
+  ): Promise<DocumentItem[]> {
     try {
-      const response = await api.get<DocumentItem[]>('/api/v1/documents', {
+      const response = await api.get<DocumentItem[]>("/api/v1/documents", {
         params: { category, search },
       });
-      
-      // Format for frontend display
-      return response.data.map(doc => ({
+      return response.data.map((doc) => ({
         ...doc,
         id: String(doc.id),
         size: formatFileSize(doc.fileSize),
         date: formatRelativeTime(doc.createdAt),
-        type: doc.fileUrl.split('.').pop()?.toUpperCase() || 'FILE',
-        access: 'All Staff', // Default, adjust based on your needs
+        type: doc.mimeType
+          ? mimeTypeToLabel(doc.mimeType)
+          : doc.fileUrl.split(".").pop()?.toUpperCase() || "FILE",
+        access: "All Staff",
       }));
     } catch (error) {
       throw handleApiError(error);
@@ -306,7 +279,6 @@ export class DataService {
         id: String(response.data.id),
         size: formatFileSize(response.data.fileSize),
         date: formatRelativeTime(response.data.createdAt),
-        type: response.data.fileUrl.split('.').pop()?.toUpperCase() || 'FILE',
       };
     } catch (error) {
       throw handleApiError(error);
@@ -315,11 +287,51 @@ export class DataService {
 
   static async createDocument(data: CreateDocumentData): Promise<DocumentItem> {
     try {
-      const response = await api.post<DocumentItem>('/api/v1/documents', data);
-      return {
-        ...response.data,
-        id: String(response.data.id),
-      };
+      const response = await api.post<DocumentItem>("/api/v1/documents", data);
+      return { ...response.data, id: String(response.data.id) };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  /**
+   * Register a Google Drive file as a document in the app.
+   * The backend sets sharing permissions on the Drive file automatically.
+   *
+   * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create
+   */
+  static async createDocumentFromDrive(
+    data: CreateDriveDocumentData,
+  ): Promise<DocumentItem> {
+    try {
+      const response = await api.post<DocumentItem>(
+        "/api/v1/documents/from-drive",
+        data,
+      );
+      return { ...response.data, id: String(response.data.id) };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  /**
+   * Fetch files shared with the current user from Google Drive.
+   * Backend calls Drive API and syncs results into the local documents table.
+   *
+   * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
+   */
+  static async getSharedWithMe(): Promise<DocumentItem[]> {
+    try {
+      const response = await api.get<DocumentItem[]>(
+        "/api/v1/documents/shared-with-me",
+      );
+      return response.data.map((doc) => ({
+        ...doc,
+        id: String(doc.id),
+        size: formatFileSize(doc.fileSize),
+        date: formatRelativeTime(doc.createdAt),
+        type: doc.mimeType ? mimeTypeToLabel(doc.mimeType) : "FILE",
+      }));
     } catch (error) {
       throw handleApiError(error);
     }
@@ -333,42 +345,25 @@ export class DataService {
     }
   }
 
-  // ========================================
-  // Polls
-  // ========================================
-
-  static async getPolls(status?: 'active' | 'completed'): Promise<Poll[]> {
+  static async getPolls(status?: "active" | "completed"): Promise<Poll[]> {
     try {
-      const response = await api.get<Poll[]>('/api/v1/polls', {
+      const response = await api.get<Poll[]>("/api/v1/polls", {
         params: { status },
       });
-      
-      // Format for frontend display
-      return response.data.map(poll => ({
+      return response.data.map((poll) => ({
         ...poll,
         question: poll.title,
-        status: poll.isActive ? 'active' : 'completed',
-        timeLeft: poll.expiresAt 
-          ? (new Date(poll.expiresAt) > new Date() 
-            ? `Ends ${formatRelativeTime(poll.expiresAt).replace(' ago', '')}`
-            : `Ended ${formatRelativeTime(poll.expiresAt)}`)
-          : (poll.isActive ? 'No expiry' : 'Ended'),
-        creator: 'Administrator', // Backend doesn't return this, you could add it
-        voted: false, // You'd need to track this per-user
+        status: poll.isActive ? "active" : "completed",
+        timeLeft: poll.expiresAt
+          ? new Date(poll.expiresAt) > new Date()
+            ? `Ends ${formatRelativeTime(poll.expiresAt).replace(" ago", "")}`
+            : `Ended ${formatRelativeTime(poll.expiresAt)}`
+          : poll.isActive
+            ? "No expiry"
+            : "Ended",
+        creator: "Administrator",
+        voted: false,
       }));
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  }
-
-  static async getPoll(id: number): Promise<Poll> {
-    try {
-      const response = await api.get<Poll>(`/api/v1/polls/${id}`);
-      return {
-        ...response.data,
-        question: response.data.title,
-        status: response.data.isActive ? 'active' : 'completed',
-      };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -376,7 +371,7 @@ export class DataService {
 
   static async createPoll(data: CreatePollData): Promise<Poll> {
     try {
-      const response = await api.post<Poll>('/api/v1/polls', data);
+      const response = await api.post<Poll>("/api/v1/polls", data);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -385,9 +380,7 @@ export class DataService {
 
   static async votePoll(pollId: number, optionId: number): Promise<void> {
     try {
-      await api.post(`/api/v1/polls/${pollId}/vote`, {
-        option_id: optionId,
-      });
+      await api.post(`/api/v1/polls/${pollId}/vote`, { option_id: optionId });
     } catch (error) {
       throw handleApiError(error);
     }
@@ -400,23 +393,18 @@ export class DataService {
       throw handleApiError(error);
     }
   }
-
-  // ========================================
-  // Notifications
-  // ========================================
-
-  static async getNotifications(unreadOnly: boolean = false): Promise<Notification[]> {
+  static async getNotifications(
+    unreadOnly: boolean = false,
+  ): Promise<Notification[]> {
     try {
-      const response = await api.get<Notification[]>('/api/v1/notifications', {
+      const response = await api.get<Notification[]>("/api/v1/notifications", {
         params: { unread_only: unreadOnly },
       });
-      
-      // Format for frontend display
-      return response.data.map(notif => ({
+      return response.data.map((notif) => ({
         ...notif,
         time: formatRelativeTime(notif.createdAt),
         read: notif.isRead,
-        sender: 'System', // Backend doesn't track sender, you could add it
+        sender: "System",
       }));
     } catch (error) {
       throw handleApiError(error);
@@ -425,7 +413,9 @@ export class DataService {
 
   static async getUnreadCount(): Promise<number> {
     try {
-      const response = await api.get<{ unreadCount: number }>('/api/v1/notifications/unread-count');
+      const response = await api.get<{ unreadCount: number }>(
+        "/api/v1/notifications/unread-count",
+      );
       return response.data.unreadCount;
     } catch (error) {
       throw handleApiError(error);
@@ -442,7 +432,7 @@ export class DataService {
 
   static async markAllNotificationsRead(): Promise<void> {
     try {
-      await api.patch('/api/v1/notifications/read-all');
+      await api.patch("/api/v1/notifications/read-all");
     } catch (error) {
       throw handleApiError(error);
     }
@@ -454,7 +444,7 @@ export class DataService {
 
   static async getUsers(department?: string): Promise<any[]> {
     try {
-      const response = await api.get('/api/v1/users', {
+      const response = await api.get("/api/v1/users", {
         params: { department },
       });
       return response.data;
@@ -471,6 +461,28 @@ export class DataService {
       throw handleApiError(error);
     }
   }
+}
+
+// ============================================
+// Helpers
+// ============================================
+
+/**
+ * Convert a Drive mimeType to a short display label.
+ * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/files
+ */
+
+function mimeTypeToLabel(mimeType: string): string {
+  const map: Record<string, string> = {
+    "application/pdf": "PDF",
+    "application/vnd.google-apps.document": "DOC",
+    "application/vnd.google-apps.spreadsheet": "SHEET",
+    "application/vnd.google-apps.presentation": "SLIDES",
+    "application/vnd.google-apps.folder": "FOLDER",
+    "image/jpeg": "JPG",
+    "image/png": "PNG",
+  };
+  return map[mimeType] || mimeType.split("/").pop()?.toUpperCase() || "FILE";
 }
 
 export default DataService;

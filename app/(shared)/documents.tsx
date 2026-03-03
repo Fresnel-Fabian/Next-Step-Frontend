@@ -1,464 +1,620 @@
-import { DocumentListItem } from '@/components/documents/DocumentListItem';
-import { DataService } from '@/services/dataService';
-import { DocumentItem } from '@/types/document';
-import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { DocumentListItem } from "@/components/documents/DocumentListItem";
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from 'react-native';
+  downloadFile,
+  GOOGLE_ACCESS_TOKEN_KEY,
+  listAllFiles,
+  listRecentFiles,
+  listSharedWithMe,
+  openSharingSettings,
+  previewFile,
+  searchFiles,
+  SORT_LABELS,
+  sortDocuments,
+  SortOption,
+  uploadFile,
+} from "@/services/googleDriveService";
+import { DocumentItem } from "@/types/document";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as DocumentPicker from "expo-document-picker";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-export default function DocumentsScreen() {
+type DriveCategory = "all" | "recent" | "shared with me";
+
+const CATEGORIES: { label: string; value: DriveCategory; icon: string }[] = [
+  { label: "All Files", value: "all", icon: "grid-outline" },
+  { label: "Recent", value: "recent", icon: "time-outline" },
+  { label: "Shared with me", value: "shared with me", icon: "people-outline" },
+];
+
+export default function AdminDocuments() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(0);
-  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] =
+    useState<DriveCategory>("all");
+  const [sortOption, setSortOption] = useState<SortOption>("viewedByMe_desc");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [driveError, setDriveError] = useState<string | null>(null);
 
-  const categories = ['All Documents', 'Policies', 'Forms', 'Handbooks', 'Resources'];
+  // Animate sort dropdown
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    Animated.timing(dropdownAnim, {
+      toValue: sortMenuOpen ? 1 : 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [sortMenuOpen]);
 
-  const fetchDocuments = async () => {
+  // ─── Load documents by category ──────────────────────────────────────────
+  useEffect(() => {
+    loadDocuments();
+  }, [selectedCategory]);
+
+  const loadDocuments = async (isRefresh = false) => {
     try {
-      setLoading(true);
-      const data = await DataService.getDocuments();
-      setDocuments(data);
-    } catch (error) {
-      console.error('Failed to fetch documents:', error);
+      isRefresh ? setRefreshing(true) : setLoading(true);
+      setDriveError(null);
+      setSearch("");
+
+      let data: DocumentItem[];
+      if (selectedCategory === "shared with me") {
+        data = await listSharedWithMe();
+      } else if (selectedCategory === "recent") {
+        data = await listRecentFiles();
+      } else {
+        data = await listAllFiles();
+      }
+
+      setDocuments(sortDocuments(data, sortOption));
+    } catch (err: any) {
+      // Inline error only — never block the full screen
+      setDriveError(err.message || "Failed to load documents");
+      setDocuments([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const filteredDocuments = documents.filter(doc =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
+  // ─── Re-sort in place without refetching ─────────────────────────────────
+  const handleSortChange = (option: SortOption) => {
+    setSortOption(option);
+    setSortMenuOpen(false);
+    setDocuments((prev) => sortDocuments(prev, option));
+  };
+
+  // ─── Search ───────────────────────────────────────────────────────────────
+  const handleSearch = async (text: string) => {
+    setSearch(text);
+    if (text.length === 0) {
+      loadDocuments();
+      return;
+    }
+    if (text.length >= 2) {
+      try {
+        const results = await searchFiles(text);
+        setDocuments(sortDocuments(results, sortOption));
+      } catch {
+        // fail silently on search
+      }
+    }
+  };
+
+  // ─── Actions ──────────────────────────────────────────────────────────────
+  const handlePreview = async (doc: DocumentItem) => {
+    try {
+      await previewFile(doc);
+    } catch (err: any) {
+      Alert.alert("Preview failed", err.message);
+    }
+  };
+
+  const handleDownload = async (doc: DocumentItem) => {
+    try {
+      await downloadFile(doc);
+    } catch (err: any) {
+      Alert.alert("Download failed", err.message);
+    }
+  };
+
+  const handleShare = async (doc: DocumentItem) => {
+    try {
+      await openSharingSettings(doc);
+    } catch (err: any) {
+      Alert.alert("Could not open sharing", err.message);
+    }
+  };
+
+  const handleUpload = async () => {
+    const token = await AsyncStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
+    if (!token) {
+      Alert.alert(
+        "Google sign-in required",
+        "Please sign out and sign back in with Google to upload files.",
+      );
+      return;
+    }
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+
+      const file = result.assets[0];
+      setUploading(true);
+
+      const uploaded = await uploadFile(
+        file.name,
+        file.uri,
+        file.mimeType ?? "application/octet-stream",
+      );
+
+      // Add to top of list and ask if user wants to open sharing settings
+      setDocuments((prev) => sortDocuments([uploaded, ...prev], sortOption));
+
+      Alert.alert(
+        "Upload successful",
+        `"${file.name}" was uploaded to your Drive. Would you like to set sharing permissions now?`,
+        [
+          { text: "Later", style: "cancel" },
+          { text: "Share now", onPress: () => handleShare(uploaded) },
+        ],
+      );
+    } catch (err: any) {
+      Alert.alert("Upload failed", err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ─── Filtered list ────────────────────────────────────────────────────────
+  const displayedDocuments =
+    search.length > 0
+      ? documents.filter((d) =>
+          d.title.toLowerCase().includes(search.toLowerCase()),
+        )
+      : documents;
+
+  // ─── Header ───────────────────────────────────────────────────────────────
+  const renderHeader = () => (
+    <View>
+      {/* Page title + Upload + Sort */}
+      <View style={styles.pageHeader}>
+        <View>
+          <Text style={styles.pageTitle}>Documents</Text>
+          <Text style={styles.pageSubtitle}>
+            {documents.length} file{documents.length !== 1 ? "s" : ""}
+            {selectedCategory !== "all" ? ` · ${selectedCategory}` : ""}
+          </Text>
+        </View>
+
+        <View style={styles.headerActions}>
+          {/* Upload button */}
+          <Pressable
+            style={[styles.uploadButton, uploading && { opacity: 0.6 }]}
+            onPress={handleUpload}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons name="cloud-upload-outline" size={18} color="white" />
+            )}
+            <Text style={styles.uploadButtonText}>
+              {uploading ? "Uploading…" : "Upload"}
+            </Text>
+          </Pressable>
+
+          {/* Sort dropdown trigger */}
+          <View>
+            <Pressable
+              style={styles.sortButton}
+              onPress={() => setSortMenuOpen((v) => !v)}
+            >
+              <Ionicons name="funnel-outline" size={16} color="#374151" />
+              <Ionicons
+                name={sortMenuOpen ? "chevron-up" : "chevron-down"}
+                size={14}
+                color="#374151"
+              />
+            </Pressable>
+
+            {/* Dropdown menu */}
+            {sortMenuOpen && (
+              <Animated.View
+                style={[
+                  styles.sortDropdown,
+                  {
+                    opacity: dropdownAnim,
+                    transform: [
+                      {
+                        translateY: dropdownAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-6, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                {(Object.entries(SORT_LABELS) as [SortOption, string][]).map(
+                  ([key, label]) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.sortOption,
+                        sortOption === key && styles.sortOptionActive,
+                      ]}
+                      onPress={() => handleSortChange(key)}
+                    >
+                      {sortOption === key && (
+                        <Ionicons
+                          name="checkmark"
+                          size={14}
+                          color="#2563EB"
+                          style={{ marginRight: 6 }}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.sortOptionText,
+                          sortOption === key && styles.sortOptionTextActive,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ),
+                )}
+              </Animated.View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <Ionicons
+          name="search-outline"
+          size={18}
+          color="#9CA3AF"
+          style={styles.searchIcon}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search Drive..."
+          placeholderTextColor="#9CA3AF"
+          value={search}
+          onChangeText={handleSearch}
+          clearButtonMode="while-editing"
+        />
+      </View>
+
+      {/* Category chips */}
+      <FlatList
+        data={CATEGORIES}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.value}
+        contentContainerStyle={styles.categoriesContainer}
+        style={styles.categoriesList}
+        renderItem={({ item }) => {
+          const isActive = selectedCategory === item.value;
+          return (
+            <Pressable
+              style={[
+                styles.categoryChip,
+                isActive && styles.categoryChipActive,
+              ]}
+              onPress={() => setSelectedCategory(item.value)}
+            >
+              <Ionicons
+                name={item.icon as any}
+                size={14}
+                color={isActive ? "white" : "#6B7280"}
+              />
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  isActive && styles.categoryChipTextActive,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        }}
+      />
+
+      {!loading && displayedDocuments.length > 0 && (
+        <Text style={styles.summaryText}>
+          {displayedDocuments.length} result
+          {displayedDocuments.length !== 1 ? "s" : ""} ·{" "}
+          {SORT_LABELS[sortOption]}
+        </Text>
+      )}
+    </View>
   );
 
-  const handleDownload = (doc: DocumentItem) => {
-    console.log('Download:', doc.title);
-    // TODO: Implement download
+  const renderEmpty = () => {
+    if (loading) return null;
+
+    if (driveError) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
+          <Text style={styles.emptyTitle}>
+            {selectedCategory === "shared with me"
+              ? "Can't load shared files"
+              : "Can't connect to Drive"}
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: "#EF4444" }]}>
+            {driveError}
+          </Text>
+          <Pressable style={styles.retryButton} onPress={() => loadDocuments()}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="cloud-outline" size={52} color="#D1D5DB" />
+        <Text style={styles.emptyTitle}>No documents found</Text>
+        <Text style={styles.emptySubtitle}>
+          {search
+            ? `No Drive files matching "${search}"`
+            : selectedCategory === "shared with me"
+              ? "No files have been shared with you yet"
+              : selectedCategory === "recent"
+                ? "No recently viewed files"
+                : "Upload a file or ask someone to share one with you"}
+        </Text>
+      </View>
+    );
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centered}>
         <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.loadingText}>Loading from Google Drive…</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Document Center</Text>
-        <Text style={styles.subtitle}>Access and manage important documents</Text>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Categories */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesScroll}
-          contentContainerStyle={styles.categoriesContent}
-        >
-          {categories.map((cat, idx) => (
-            <Pressable
-              key={cat}
-              style={[
-                styles.categoryButton,
-                selectedCategory === idx && styles.categoryButtonActive
-              ]}
-              onPress={() => setSelectedCategory(idx)}
-            >
-              {selectedCategory === idx && <View style={styles.categoryDot} />}
-              <Text style={[
-                styles.categoryText,
-                selectedCategory === idx && styles.categoryTextActive
-              ]}>
-                {cat}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {/* Quick Stats */}
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{documents.length}</Text>
-            <Text style={styles.statLabel}>Total Documents</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#2563EB' }]}>6</Text>
-            <Text style={styles.statLabel}>Added This Week</Text>
-          </View>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search documents..."
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+    <Pressable style={styles.container} onPress={() => setSortMenuOpen(false)}>
+      <FlatList
+        data={displayedDocuments}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <DocumentListItem
+            document={item}
+            onPreview={() => handlePreview(item)}
+            onDownload={() => handleDownload(item)}
+            onDelete={() => handleShare(item)} // Admins manage via Drive sharing
           />
-          <Pressable style={styles.filterButton}>
-            <Ionicons name="options-outline" size={20} color="#6B7280" />
-          </Pressable>
-        </View>
-
-        {/* Document List */}
-        <View style={styles.documentList}>
-          {filteredDocuments.map((doc) => (
-            <DocumentListItem
-              key={doc.id}
-              document={doc}
-              onPreview={() => setPreviewDoc(doc)}
-              onDownload={() => handleDownload(doc)}
-            />
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Preview Modal */}
-      <Modal
-        visible={!!previewDoc}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setPreviewDoc(null)}
-      >
-        {previewDoc && (
-          <View style={styles.modalContainer}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                <Pressable onPress={() => setPreviewDoc(null)} style={styles.closeButton}>
-                  <Ionicons name="close" size={24} color="white" />
-                </Pressable>
-                <Text style={styles.modalTitle} numberOfLines={1}>
-                  {previewDoc.title}
-                </Text>
-                <View style={styles.modalSizeBadge}>
-                  <Text style={styles.modalSizeText}>{previewDoc.size}</Text>
-                </View>
-              </View>
-              <View style={styles.modalHeaderRight}>
-                <Pressable style={styles.modalIconButton}>
-                  <Ionicons name="download-outline" size={20} color="white" />
-                </Pressable>
-                <Pressable style={styles.modalIconButton}>
-                  <Ionicons name="share-outline" size={20} color="white" />
-                </Pressable>
-                <Pressable style={styles.modalOpenButton}>
-                  <Text style={styles.modalOpenButtonText}>Open</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Modal Content */}
-            <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentInner}>
-              <View style={styles.previewDocument}>
-                <Text style={styles.previewTitle}>{previewDoc.title}</Text>
-                <Text style={styles.previewCategory}>{previewDoc.category}</Text>
-
-                <View style={styles.previewTOC}>
-                  <Text style={styles.previewTOCTitle}>Table of Contents - Page 1</Text>
-                  <View style={styles.previewTOCList}>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>1. Introduction</Text>
-                      <Text style={styles.previewTOCPage}>Page 1</Text>
-                    </View>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>2. Mission and Values</Text>
-                      <Text style={styles.previewTOCPage}>Page 3</Text>
-                    </View>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>3. Policies and Procedures</Text>
-                      <Text style={styles.previewTOCPage}>Page 5</Text>
-                    </View>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>4. Code of Conduct</Text>
-                      <Text style={styles.previewTOCPage}>Page 8</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.previewNote}>
-                  <Text style={styles.previewNoteText}>
-                    Note: This is a preview of the document. Download the full PDF to view all content and features.
-                  </Text>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
         )}
-      </Modal>
-    </View>
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={styles.listContent}
+        onRefresh={() => loadDocuments(true)}
+        refreshing={refreshing}
+        showsVerticalScrollIndicator={false}
+      />
+    </Pressable>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
-  loadingContainer: {
+  centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    gap: 12,
+    padding: 32,
   },
-  header: {
-    padding: 16,
-    paddingTop: 60,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  subtitle: {
+  loadingText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
   },
-  content: {
-    flex: 1,
+  errorText: {
+    fontSize: 14,
+    color: "#EF4444",
+    textAlign: "center",
   },
-  categoriesScroll: {
-    maxHeight: 50,
-    marginTop: 16,
-  },
-  categoriesContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+  retryButton: {
+    marginTop: 8,
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: 'white',
+  },
+  retryButtonText: {
+    color: "white",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  pageHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  pageSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
-  categoryButtonActive: {
-    backgroundColor: '#EFF6FF',
+  uploadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
   },
-  categoryDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#2563EB',
+  uploadButtonText: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "600",
   },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  categoryTextActive: {
-    color: '#2563EB',
-  },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 12,
+  sortButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "white",
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 10,
   },
-  statItem: {
-    flex: 1,
+  sortDropdown: {
+    position: "absolute",
+    top: 44,
+    right: 0,
+    width: 220,
+    backgroundColor: "white",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 999,
+    overflow: "hidden",
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
+  sortOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
+  sortOptionActive: {
+    backgroundColor: "#EFF6FF",
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 16,
+  sortOptionText: {
+    fontSize: 13,
+    color: "#374151",
+  },
+  sortOptionTextActive: {
+    color: "#2563EB",
+    fontWeight: "600",
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    height: 44,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
+    fontSize: 14,
+    color: "#111827",
   },
-  filterButton: {
-    padding: 8,
-    marginLeft: 8,
+  categoriesList: {
+    marginBottom: 12,
   },
-  documentList: {
-    padding: 16,
+  categoriesContainer: {
+    gap: 8,
+    paddingRight: 4,
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  modalHeader: {
-    backgroundColor: '#1E293B',
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  modalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    marginRight: 16,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'white',
-    flex: 1,
-  },
-  modalSizeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
   },
-  modalSizeText: {
+  categoryChipActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6B7280",
+  },
+  categoryChipTextActive: {
+    color: "white",
+  },
+  summaryText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
+    marginBottom: 12,
   },
-  modalHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  emptyContainer: {
+    alignItems: "center",
+    paddingTop: 60,
+    gap: 8,
   },
-  modalIconButton: {
-    padding: 4,
-  },
-  modalOpenButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  modalOpenButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalContent: {
-    flex: 1,
-  },
-  modalContentInner: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  previewDocument: {
-    backgroundColor: 'white',
-    width: '100%',
-    maxWidth: 600,
-    padding: 48,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  previewTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  previewCategory: {
-    fontSize: 14,
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  previewTOC: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 32,
-    marginVertical: 32,
-  },
-  previewTOCTitle: {
+  emptyTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
+    fontWeight: "600",
+    color: "#374151",
   },
-  previewTOCList: {
-    gap: 16,
-  },
-  previewTOCItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  previewTOCText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  previewTOCPage: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  previewNote: {
-    backgroundColor: '#EFF6FF',
-    padding: 16,
-    borderRadius: 8,
-  },
-  previewNoteText: {
-    fontSize: 14,
-    color: '#1E40AF',
-    textAlign: 'center',
+  emptySubtitle: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
 });
