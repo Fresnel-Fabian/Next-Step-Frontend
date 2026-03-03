@@ -10,8 +10,12 @@
 import { GoogleAuthConfig } from "@/config/google-auth";
 import { useAuthStore } from "@/store/authStore";
 import { Ionicons } from "@expo/vector-icons";
-import { ResponseType } from "expo-auth-session";
-import * as Google from "expo-auth-session/providers/google";
+import {
+  makeRedirectUri,
+  ResponseType,
+  useAuthRequest,
+  useAutoDiscovery,
+} from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -30,6 +34,10 @@ import {
 // This is required for the auth session to work
 WebBrowser.maybeCompleteAuthSession();
 
+// Google's OIDC discovery document: expo-auth-session reads authorization
+// and token endpoints from here automatically.
+const GOOGLE_DISCOVERY_URL = "https://accounts.google.com";
+
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithGoogle } = useAuthStore();
@@ -40,25 +48,46 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Google Sign-In setup
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: GoogleAuthConfig.webClientId,
-    iosClientId: GoogleAuthConfig.iosClientId,
-    androidClientId: GoogleAuthConfig.androidClientId,
-    scopes: ["openid", "email", "profile"], // IdToken flow only allows a subset of [openid, email, profile]
-    responseType: ResponseType.IdToken,
+  const discovery = useAutoDiscovery(GOOGLE_DISCOVERY_URL);
+  const redirectUri = makeRedirectUri({
+    // scheme: "myapp",  // uncomment and set for standalone builds
   });
+
+  // ── Base useAuthRequest (NOT Google.useAuthRequest) ───────────────────────
+  // Using the Google provider's hook causes it to auto-exchange the code for
+  // tokens on the client side, which requires a client_secret that cannot
+  // safely be bundled in a mobile app.
+  //
+  // The base hook just obtains the authorization code and code verifier;
+  // our backend performs the actual token exchange.
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId: GoogleAuthConfig.webClientId,
+      scopes: GoogleAuthConfig.scopes,
+      redirectUri,
+      responseType: ResponseType.Code,
+      usePKCE: true,
+    },
+    discovery,
+  );
 
   // Handle Google auth response
   useEffect(() => {
     if (response?.type === "success") {
-      const { authentication, params } = response as any;
-      const idToken = params?.id_token ?? authentication?.idToken;
-      const accessToken = params?.access_token ?? authentication?.accessToken;
+      const code = response.params.code;
+      const codeVerifier = request?.codeVerifier;
 
-      handleGoogleSuccess(idToken, accessToken);
+      if (!code || !codeVerifier) {
+        setError("Google sign-in failed: missing PKCE parameters.");
+        setIsLoading(false);
+        return;
+      }
+
+      handleGoogleSuccess(code, codeVerifier, redirectUri);
     } else if (response?.type === "error") {
-      setError("Google sign-in failed. Please try again.");
+      setError(
+        response.error?.message ?? "Google sign-in failed. Please try again.",
+      );
       setIsLoading(false);
     } else if (response?.type === "dismiss") {
       setIsLoading(false);
@@ -66,39 +95,23 @@ export default function LoginScreen() {
   }, [response]);
 
   const handleGoogleSuccess = async (
-    idToken?: string,
-    accessToken?: string,
+    code: string,
+    codeVerifier: string,
+    redirectUri: string,
   ) => {
-    const tokenToSend = idToken || accessToken;
-
-    if (!tokenToSend) {
-      setError("Failed to get authentication token");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // Fetch user info from Google
-      const userInfoResponse = await fetch(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        },
-      );
-      const userData = await userInfoResponse.json();
-
-      // Login with Google — send idToken to backend for verification
-      await loginWithGoogle(tokenToSend, userData, accessToken);
-
-      // Navigation happens automatically via root layout
+      // Backend exchanges the code for id_token + access_token + refresh_token,
+      // verifies identity, stores Drive tokens, and returns our own JWT.
+      await loginWithGoogle(code, codeVerifier, redirectUri);
     } catch (err) {
       console.error("Google auth error:", err);
-      setError("Failed to complete Google sign-in");
+      setError("Failed to complete Google sign-in. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Email/password login handler
   const handleEmailLogin = async () => {
     if (!email || !password) {
       setError("Please enter both email and password.");
@@ -110,7 +123,7 @@ export default function LoginScreen() {
 
     try {
       await login(email, password);
-    } catch (err) {
+    } catch {
       setError("Invalid credentials.");
     } finally {
       setIsLoading(false);
@@ -239,10 +252,10 @@ export default function LoginScreen() {
           <Pressable
             style={[
               styles.googleButton,
-              (!request || isLoading) && styles.buttonDisabled,
+              (!request || !discovery || isLoading) && styles.buttonDisabled,
             ]}
             onPress={handleGoogleLogin}
-            disabled={!request || isLoading}
+            disabled={!request || !discovery || isLoading}
           >
             {isLoading && !email ? (
               <ActivityIndicator color="#2563EB" />
@@ -265,19 +278,9 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
+  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 24 },
+  header: { alignItems: "center", marginBottom: 32 },
   logoContainer: {
     backgroundColor: "#2563EB",
     width: 64,
@@ -293,10 +296,7 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
+  subtitle: { fontSize: 14, color: "#6B7280" },
   formContainer: {
     backgroundColor: "white",
     borderRadius: 16,
@@ -318,20 +318,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
   },
-  errorText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#DC2626",
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 8,
-  },
+  errorText: { flex: 1, fontSize: 14, color: "#DC2626" },
+  inputGroup: { marginBottom: 16 },
+  label: { fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -341,24 +330,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: "white",
   },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#111827",
-  },
-  forgotPassword: {
-    alignSelf: "flex-end",
-    marginBottom: 16,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: "#2563EB",
-    fontWeight: "600",
-  },
+  inputIcon: { marginRight: 8 },
+  input: { flex: 1, paddingVertical: 12, fontSize: 16, color: "#111827" },
+  forgotPassword: { alignSelf: "flex-end", marginBottom: 16 },
+  forgotPasswordText: { fontSize: 14, color: "#2563EB", fontWeight: "600" },
   signInButton: {
     backgroundColor: "#2563EB",
     borderRadius: 12,
@@ -366,29 +341,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  signInButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: "#6B7280",
-  },
+  signInButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  buttonDisabled: { opacity: 0.7 },
+  divider: { flexDirection: "row", alignItems: "center", marginVertical: 24 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "#E5E7EB" },
+  dividerText: { marginHorizontal: 16, fontSize: 14, color: "#6B7280" },
   googleButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -400,11 +357,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 8,
   },
-  googleButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#374151",
-  },
+  googleButtonText: { fontSize: 16, fontWeight: "600", color: "#374151" },
   footerText: {
     textAlign: "center",
     fontSize: 14,

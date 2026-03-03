@@ -1,29 +1,24 @@
+// services/dataService.ts
 /**
- * Data Service - API calls for all data operations
+ * Data Service — API calls for all data operations.
+ *
+ * Drive-related methods call backend endpoints which in turn
+ * call the Google Drive API. The frontend never calls Drive directly
+ * except for the Picker UI.
  */
 
-import { CreateDocumentData, DocumentItem } from "@/types/document";
 import api, { handleApiError } from "./api";
-
-// ============================================
-// Re-export DocumentItem so existing imports work
-// ============================================
-export type { CreateDocumentData, DocumentItem };
-
-// ============================================
-// Types - Dashboard
-// ============================================
 
 export interface DashboardStats {
   totalStaff: number;
   staffTrend: string;
   activeSchedules: number;
-  schedulesTrend?: string;
+  schedulesTrend: string;
   notificationsSent: number;
-  notificationsTrend?: string;
+  notificationsTrend: string;
   totalDocuments: number;
-  documentsTrend?: string;
-  chartData?: Array<{ name: string; active: number }>;
+  documentsTrend: string;
+  chartData: Array<{ name: string; active: number }>;
 }
 
 export interface ActivityLog {
@@ -33,10 +28,6 @@ export interface ActivityLog {
   timestamp: string;
 }
 
-// ============================================
-// Types - Schedule
-// ============================================
-
 export interface ScheduleDTO {
   id: string;
   department: string;
@@ -44,14 +35,6 @@ export interface ScheduleDTO {
   staffCount: number;
   status: string;
   lastUpdated: string;
-}
-
-export interface StaffScheduleItem {
-  id: string;
-  time: string;
-  title: string;
-  location: string;
-  isStartingSoon: boolean;
 }
 
 export interface CreateScheduleData {
@@ -68,9 +51,45 @@ export interface UpdateScheduleData {
   status?: string;
 }
 
-// ============================================
-// Types - Poll
-// ============================================
+export interface DocumentItem {
+  id: string;
+  title: string;
+  category: string;
+  description?: string;
+  fileUrl: string;
+  fileSize: number;
+  uploadedBy: number;
+  createdAt: string;
+  // Google Drive fields — null for non-Drive documents
+  // See: https://developers.google.com/workspace/drive/api/reference/rest/v3/files
+  driveFileId?: string; // Files resource `id`
+  webViewLink?: string; // Files resource `webViewLink`
+  mimeType?: string; // Files resource `mimeType`
+  isSharedWithMe?: boolean;
+  driveOwnerEmail?: string;
+  // Frontend display fields (computed locally)
+  type?: string;
+  size?: string;
+  date?: string;
+  access?: string;
+}
+
+export interface CreateDocumentData {
+  title: string;
+  category: string;
+  description?: string;
+  file_url: string;
+  file_size: number;
+}
+
+export interface CreateDriveDocumentData {
+  title: string;
+  category: string;
+  description?: string;
+  drive_file_id: string;
+  web_view_link: string;
+  mime_type: string;
+}
 
 export interface PollOption {
   id: number;
@@ -101,10 +120,6 @@ export interface CreatePollData {
   options: Array<{ id: number; text: string }>;
   expires_at?: string;
 }
-
-// ============================================
-// Types - Notification
-// ============================================
 
 export interface Notification {
   id: number;
@@ -143,52 +158,7 @@ const formatFileSize = (bytes: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const inferFileType = (url: string): DocumentItem["type"] => {
-  const ext = url.split(".").pop()?.toUpperCase();
-  if (ext === "PDF") return "PDF";
-  if (ext === "DOC" || ext === "DOCX") return "DOC";
-  if (ext === "XLS" || ext === "XLSX") return "XLS";
-  return "FILE";
-};
-
-// ============================================
-// Raw API shape returned by backend
-// ============================================
-interface RawDocumentItem {
-  id: string | number;
-  title: string;
-  category: string;
-  description: string;
-  url: string;
-  fileSize: number;
-  uploadedBy: number;
-  uploadedByName?: string;
-  createdAt: string;
-  accessLevel?: string;
-}
-
-const mapDocument = (doc: RawDocumentItem): DocumentItem => ({
-  id: String(doc.id),
-  title: doc.title,
-  category: doc.category,
-  description: doc.description,
-  type: inferFileType(doc.url),
-  size: formatFileSize(doc.fileSize),
-  author: doc.uploadedByName || `User #${doc.uploadedBy}`,
-  date: formatRelativeTime(doc.createdAt),
-  access: doc.accessLevel || "All Staff",
-  url: doc.url,
-});
-
-// ============================================
-// Data Service Class
-// ============================================
-
 export class DataService {
-  // ========================================
-  // Dashboard
-  // ========================================
-
   static async getDashboardStats(): Promise<DashboardStats> {
     try {
       const response = await api.get<DashboardStats>("/api/v1/dashboard/stats");
@@ -197,7 +167,6 @@ export class DataService {
         schedulesTrend: response.data.schedulesTrend || "Updated recently",
         notificationsTrend: response.data.notificationsTrend || "this week",
         documentsTrend: response.data.documentsTrend || "added recently",
-        chartData: response.data.chartData || [],
       };
     } catch (error) {
       throw handleApiError(error);
@@ -222,10 +191,6 @@ export class DataService {
     }
   }
 
-  // ========================================
-  // Schedules
-  // ========================================
-
   static async getSchedules(
     search?: string,
     status?: string,
@@ -239,37 +204,6 @@ export class DataService {
         id: String(schedule.id),
         lastUpdated: formatRelativeTime(schedule.lastUpdated),
       }));
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  }
-
-  /**
-   * Returns today's schedule items for the logged-in staff member,
-   * formatted for the StaffScheduleItem component.
-   */
-  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
-    try {
-      const response = await api.get<StaffScheduleItem[]>(
-        "/api/v1/schedules/today",
-      );
-      return response.data.map((item) => ({
-        ...item,
-        id: String(item.id),
-      }));
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  }
-
-  static async getSchedule(id: string): Promise<ScheduleDTO> {
-    try {
-      const response = await api.get<ScheduleDTO>(`/api/v1/schedules/${id}`);
-      return {
-        ...response.data,
-        id: String(response.data.id),
-        lastUpdated: formatRelativeTime(response.data.lastUpdated),
-      };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -314,20 +248,24 @@ export class DataService {
       throw handleApiError(error);
     }
   }
-
-  // ========================================
-  // Documents
-  // ========================================
-
   static async getDocuments(
     category?: string,
     search?: string,
   ): Promise<DocumentItem[]> {
     try {
-      const response = await api.get<RawDocumentItem[]>("/api/v1/documents", {
+      const response = await api.get<DocumentItem[]>("/api/v1/documents", {
         params: { category, search },
       });
-      return response.data.map(mapDocument);
+      return response.data.map((doc) => ({
+        ...doc,
+        id: String(doc.id),
+        size: formatFileSize(doc.fileSize),
+        date: formatRelativeTime(doc.createdAt),
+        type: doc.mimeType
+          ? mimeTypeToLabel(doc.mimeType)
+          : doc.fileUrl.split(".").pop()?.toUpperCase() || "FILE",
+        access: "All Staff",
+      }));
     } catch (error) {
       throw handleApiError(error);
     }
@@ -335,10 +273,13 @@ export class DataService {
 
   static async getDocument(id: string): Promise<DocumentItem> {
     try {
-      const response = await api.get<RawDocumentItem>(
-        `/api/v1/documents/${id}`,
-      );
-      return mapDocument(response.data);
+      const response = await api.get<DocumentItem>(`/api/v1/documents/${id}`);
+      return {
+        ...response.data,
+        id: String(response.data.id),
+        size: formatFileSize(response.data.fileSize),
+        date: formatRelativeTime(response.data.createdAt),
+      };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -346,14 +287,51 @@ export class DataService {
 
   static async createDocument(data: CreateDocumentData): Promise<DocumentItem> {
     try {
-      const response = await api.post<RawDocumentItem>("/api/v1/documents", {
-        title: data.title,
-        category: data.category,
-        description: data.description,
-        file_url: data.fileUrl,
-        file_size: data.fileSize,
-      });
-      return mapDocument(response.data);
+      const response = await api.post<DocumentItem>("/api/v1/documents", data);
+      return { ...response.data, id: String(response.data.id) };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  /**
+   * Register a Google Drive file as a document in the app.
+   * The backend sets sharing permissions on the Drive file automatically.
+   *
+   * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create
+   */
+  static async createDocumentFromDrive(
+    data: CreateDriveDocumentData,
+  ): Promise<DocumentItem> {
+    try {
+      const response = await api.post<DocumentItem>(
+        "/api/v1/documents/from-drive",
+        data,
+      );
+      return { ...response.data, id: String(response.data.id) };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  /**
+   * Fetch files shared with the current user from Google Drive.
+   * Backend calls Drive API and syncs results into the local documents table.
+   *
+   * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
+   */
+  static async getSharedWithMe(): Promise<DocumentItem[]> {
+    try {
+      const response = await api.get<DocumentItem[]>(
+        "/api/v1/documents/shared-with-me",
+      );
+      return response.data.map((doc) => ({
+        ...doc,
+        id: String(doc.id),
+        size: formatFileSize(doc.fileSize),
+        date: formatRelativeTime(doc.createdAt),
+        type: doc.mimeType ? mimeTypeToLabel(doc.mimeType) : "FILE",
+      }));
     } catch (error) {
       throw handleApiError(error);
     }
@@ -366,10 +344,6 @@ export class DataService {
       throw handleApiError(error);
     }
   }
-
-  // ========================================
-  // Polls
-  // ========================================
 
   static async getPolls(status?: "active" | "completed"): Promise<Poll[]> {
     try {
@@ -390,19 +364,6 @@ export class DataService {
         creator: "Administrator",
         voted: false,
       }));
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  }
-
-  static async getPoll(id: number): Promise<Poll> {
-    try {
-      const response = await api.get<Poll>(`/api/v1/polls/${id}`);
-      return {
-        ...response.data,
-        question: response.data.title,
-        status: response.data.isActive ? "active" : "completed",
-      };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -432,11 +393,6 @@ export class DataService {
       throw handleApiError(error);
     }
   }
-
-  // ========================================
-  // Notifications
-  // ========================================
-
   static async getNotifications(
     unreadOnly: boolean = false,
   ): Promise<Notification[]> {
@@ -505,6 +461,28 @@ export class DataService {
       throw handleApiError(error);
     }
   }
+}
+
+// ============================================
+// Helpers
+// ============================================
+
+/**
+ * Convert a Drive mimeType to a short display label.
+ * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/files
+ */
+
+function mimeTypeToLabel(mimeType: string): string {
+  const map: Record<string, string> = {
+    "application/pdf": "PDF",
+    "application/vnd.google-apps.document": "DOC",
+    "application/vnd.google-apps.spreadsheet": "SHEET",
+    "application/vnd.google-apps.presentation": "SLIDES",
+    "application/vnd.google-apps.folder": "FOLDER",
+    "image/jpeg": "JPG",
+    "image/png": "PNG",
+  };
+  return map[mimeType] || mimeType.split("/").pop()?.toUpperCase() || "FILE";
 }
 
 export default DataService;
