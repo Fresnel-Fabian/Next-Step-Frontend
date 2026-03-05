@@ -6,15 +6,15 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 
 // This is required for the auth session to work
@@ -69,7 +69,9 @@ export default function LoginScreen() {
       const userData = await userInfoResponse.json();
       
       // Login with Google user data
-      await loginWithGoogle(idToken, userData);
+      // await loginWithGoogle(idToken, userData);
+      await loginWithGoogle(idToken);
+
       
       // Navigation happens automatically via root layout
     } catch (err) {

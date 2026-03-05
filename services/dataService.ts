@@ -5,7 +5,7 @@
  * Replaces mock data with real API calls to FastAPI backend
  */
 
-import api, { handleApiError } from './api';
+import api, { handleApiError, API_BASE_URL } from './api';
 
 // ============================================
 // Types - Dashboard
@@ -28,6 +28,14 @@ export interface ActivityLog {
   title: string;
   author: string;
   timestamp: string;
+}
+
+export interface StaffScheduleItem {
+  id: string;
+  time: string;
+  title: string;
+  location: string;
+  isStartingSoon: boolean;
 }
 
 // ============================================
@@ -121,6 +129,22 @@ export interface CreatePollData {
   expires_at?: string;
 }
 
+export interface VoterDetail {
+  user_id: number;
+  user_name: string;
+  option_id: number;
+  option_text: string;
+  voted_at: string;
+}
+
+export interface PollResults {
+  poll_id: number;
+  title: string;
+  total_votes: number;
+  options: PollOption[];
+  voters: VoterDetail[];
+}
+
 // ============================================
 // Types - Notification
 // ============================================
@@ -136,6 +160,26 @@ export interface Notification {
   sender?: string;
   time?: string;
   read?: boolean;
+}
+
+export interface Announcement {
+  id: number;
+  title: string;
+  message: string;
+  fileUrl?: string;
+  fileName?: string;
+  createdBy: number;
+  createdAt: string;
+  // frontend display
+  time?: string;
+  creatorName?: string;
+}
+
+export interface CreateAnnouncementData {
+  title: string;
+  message: string;
+  file_url?: string;
+  file_name?: string;
 }
 
 // ============================================
@@ -189,6 +233,24 @@ export class DataService {
     }
   }
 
+  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
+    try {
+      const response = await api.get<ScheduleDTO[]>('/api/v1/schedules', {
+        params: { status: 'Active' },
+      });
+      // Map department schedules to staff schedule items (placeholder format)
+      return (response.data || []).slice(0, 5).map((s, i) => ({
+        id: s.id,
+        time: `${9 + i}:00 AM`,
+        title: s.department,
+        location: 'Room TBD',
+        isStartingSoon: i === 0,
+      }));
+    } catch (error) {
+      return [];
+    }
+  }
+
   static async getRecentActivity(limit: number = 20): Promise<ActivityLog[]> {
     try {
       const response = await api.get<ActivityLog[]>('/api/v1/dashboard/activity', {
@@ -201,6 +263,22 @@ export class DataService {
         id: String(activity.id),
         timestamp: formatRelativeTime(activity.timestamp),
       }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async deleteActivity(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/v1/dashboard/activity/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+static async deleteAllActivity(): Promise<void> {
+    try {
+      await api.delete('/api/v1/dashboard/activity');
     } catch (error) {
       throw handleApiError(error);
     }
@@ -346,15 +424,21 @@ export class DataService {
       // Format for frontend display
       return response.data.map(poll => ({
         ...poll,
+        id: String(poll.id),
         question: poll.title,
         status: poll.isActive ? 'active' : 'completed',
-        timeLeft: poll.expiresAt 
-          ? (new Date(poll.expiresAt) > new Date() 
+        timeLeft: poll.expiresAt
+          ? (new Date(poll.expiresAt) > new Date()
             ? `Ends ${formatRelativeTime(poll.expiresAt).replace(' ago', '')}`
             : `Ended ${formatRelativeTime(poll.expiresAt)}`)
           : (poll.isActive ? 'No expiry' : 'Ended'),
-        creator: 'Administrator', // Backend doesn't return this, you could add it
-        voted: false, // You'd need to track this per-user
+        creator: 'Administrator',
+        voted: false,
+        options: (poll.options || []).map((o: { text: string; votes: number; percentage: number }) => ({
+          label: o.text,
+          votes: o.votes,
+          percentage: o.percentage,
+        })),
       }));
     } catch (error) {
       throw handleApiError(error);
@@ -400,6 +484,104 @@ export class DataService {
       throw handleApiError(error);
     }
   }
+
+  static async deletePoll(pollId: number): Promise<void> {
+    try {
+      await api.delete(`/api/v1/polls/${pollId}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getPollResults(pollId: number): Promise<PollResults> {
+    try {
+      const response = await api.get<PollResults>(`/api/v1/polls/${pollId}/results`);
+      return {
+        ...response.data,
+        voters: response.data.voters.map(v => ({
+          ...v,
+          voted_at: formatRelativeTime(v.voted_at),
+        })),
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getAnnouncements(): Promise<Announcement[]> {
+    try {
+      const response = await api.get<Announcement[]>('/api/v1/announcements');
+      return response.data.map(a => ({
+        ...a,
+        time: formatRelativeTime(a.createdAt),
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async createAnnouncement(data: CreateAnnouncementData): Promise<Announcement> {
+    try {
+      const response = await api.post<Announcement>('/api/v1/announcements', data);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async deleteAnnouncement(id: number): Promise<void> {
+    try {
+      await api.delete(`/api/v1/announcements/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  // ========================================
+  // File Upload
+  // ========================================
+
+  static async uploadFile(fileAsset: {
+  uri: string;
+  name: string;
+  type: string;
+  file?: File; // web File object from expo-document-picker
+}): Promise<{ fileUrl: string; fileName: string; fileSize: number }> {
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const token = await AsyncStorage.getItem('auth_token');
+
+    const formData = new FormData();
+
+    if (fileAsset.file) {
+      // Web: expo-document-picker gives us a native File object directly
+      formData.append('file', fileAsset.file, fileAsset.name);
+    } else {
+      // Mobile: fetch the blob from the URI
+      const response = await fetch(fileAsset.uri);
+      const blob = await response.blob();
+      formData.append('file', blob, fileAsset.name);
+    }
+
+    // Use native fetch — NOT axios — so browser sets correct multipart boundary
+    const response = await fetch(`${API_BASE_URL}api/v1/documents/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Upload failed');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
 
   // ========================================
   // Notifications
@@ -448,6 +630,14 @@ export class DataService {
     }
   }
 
+  static async deleteNotification(id: number): Promise<void> {
+    try {
+      await api.delete(`/api/v1/notifications/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
   // ========================================
   // Users (Admin)
   // ========================================
@@ -472,5 +662,6 @@ export class DataService {
     }
   }
 }
+
 
 export default DataService;
