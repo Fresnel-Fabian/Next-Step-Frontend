@@ -28,6 +28,18 @@ export default function RootLayout() {
       return;
     }
 
+    if (inAuthGroup) {
+      // Logged in but on auth screen → redirect to appropriate dashboard
+      if (user.role === UserRole.ADMIN) {
+        router.replace('/(admin)/dashboard');
+      } else if (user.role === UserRole.TEACHER) {
+        router.replace('/(staff)/dashboard');
+      } else {
+        router.replace('/(student)/dashboard');
+      }
+      return;
+    }
+
     // User is logged in — redirect to correct group if in wrong place
     if (user.role === UserRole.ADMIN) {
       if (!inAdminGroup) router.replace('/(admin)/dashboard');
