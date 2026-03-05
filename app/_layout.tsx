@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect } from 'react';
+import Toast from 'react-native-toast-message';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -39,10 +40,14 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(admin)" />
-      <Stack.Screen name="(staff)" />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(admin)" />
+        <Stack.Screen name="(staff)" />
+      </Stack>
+      <Toast/>
+    </>
+    
   );
 }

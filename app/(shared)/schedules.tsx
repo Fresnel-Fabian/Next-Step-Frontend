@@ -1,6 +1,7 @@
 import { DataService } from '@/services/dataService';
 import { ScheduleDTO } from '@/types/schedule';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,8 +13,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export default function SchedulesScreen() {
+  const router = useRouter(); //  ADD THIS
   const [schedules, setSchedules] = useState<ScheduleDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,37 +30,119 @@ export default function SchedulesScreen() {
       setLoading(true);
       const data = await DataService.getSchedules();
       setSchedules(data);
+      // NEW: Success toast when schedules load
+      Toast.show({
+        type: 'success',
+        text1: 'Schedules Loaded',
+        text2: `${data.length} schedule${data.length > 1 ? 's' : ''} available`,
+        position: 'top',
+        visibilityTime: 2000,
+      });
     } catch (error) {
       console.error('Failed to fetch schedules:', error);
+      // NEW: Error toast when fetch fails
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Load Schedules',
+        text2: 'Please check your connection',
+        position: 'top',
+        visibilityTime: 3000,
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  //  UPDATED: Create with toast
   const handleCreate = () => {
-    Alert.alert('Coming Soon', 'Create schedule feature');
+    Toast.show({
+      type: 'info',
+      text1: 'Create Schedule',
+      text2: 'This feature is coming soon',
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    // Alert.alert('Coming Soon', 'Create schedule feature');
   };
 
+  //  UPDATED: Export with toast
   const handleExport = () => {
-    Alert.alert('Export', 'Exporting schedule data...');
+    Toast.show({
+      type: 'success',
+      text1: 'Exporting Schedules',
+      text2: 'Your schedule data is being prepared...',
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    
+    // Simulate export completion
+    setTimeout(() => {
+      Toast.show({
+        type: 'success',
+        text1: 'Export Complete',
+        text2: 'Schedule data has been exported',
+        position: 'top',
+        visibilityTime: 2000,
+      });
+    }, 2000);
   };
 
+  // UPDATED: Filter with toast
   const handleFilter = () => {
-    Alert.alert('Coming Soon', 'Filter options');
+    Toast.show({
+      type: 'info',
+      text1: 'Filter Options',
+      text2: 'Advanced filters coming soon',
+      position: 'top',
+      visibilityTime: 2000,
+    });
   };
 
+  // UPDATED: Edit with toast
   const handleEdit = (id: string) => {
-    Alert.alert('Edit', `Edit schedule ID: ${id}`);
+    Toast.show({
+      type: 'info',
+      text1: 'Edit Schedule',
+      text2: `Opening editor for schedule ${id}`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
   };
 
+  // UPDATED: View with toast
   const handleView = (id: string) => {
-    Alert.alert('View', `View details for ID: ${id}`);
+    Toast.show({
+      type: 'info',
+      text1: 'View Details',
+      text2: 'Opening schedule details',
+      position: 'top',
+      visibilityTime: 1500,
+    });
   };
 
+  // UPDATED: Sync with toast
   const handleSync = (id: string) => {
-    Alert.alert('Sync', `Syncing schedule ${id} to staff devices...`);
+    Toast.show({
+      type: 'success',
+      text1: 'Syncing Schedule',
+      text2: 'Sending to all staff devices...',
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    
+    // Simulate sync completion
+    setTimeout(() => {
+      Toast.show({
+        type: 'success',
+        text1: 'Sync Complete',
+        text2: 'Schedule synced to all devices',
+        position: 'top',
+        visibilityTime: 2000,
+      });
+    }, 2000);
   };
 
+  // UPDATED: Delete with toast
   const handleDelete = async (id: string) => {
     Alert.alert(
       'Delete Schedule',
@@ -68,8 +153,28 @@ export default function SchedulesScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await DataService.deleteSchedule(id);
-            setSchedules(prev => prev.filter(s => s.id !== id));
+            try {
+              await DataService.deleteSchedule(id);
+              setSchedules(prev => prev.filter(s => s.id !== id));
+              
+              // NEW: Success toast after delete
+              Toast.show({
+                type: 'success',
+                text1: 'Schedule Deleted',
+                text2: 'Schedule removed successfully',
+                position: 'top',
+                visibilityTime: 2000,
+              });
+            } catch (error) {
+              //  NEW: Error toast if delete fails
+              Toast.show({
+                type: 'error',
+                text1: 'Delete Failed',
+                text2: 'Could not delete schedule',
+                position: 'top',
+                visibilityTime: 3000,
+              });
+            }
           },
         },
       ]
@@ -94,9 +199,13 @@ export default function SchedulesScreen() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Header */}
+        {/* Header - UPDATED */}
         <View style={styles.header}>
-          <View>
+          {/*  ADD BACK BUTTON */}
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </Pressable>
+          <View style={styles.headerContent}>
             <Text style={styles.title}>Schedule Management</Text>
             <Text style={styles.subtitle}>Create and manage class schedules</Text>
           </View>
@@ -255,6 +364,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+    gap:12,
+  },
+   //  ADD THIS NEW STYLE
+  backButton: {
+    padding: 8,
+  },
+  //  ADD THIS NEW STYLE
+  headerContent: {
+    flex: 1,
   },
   title: {
     fontSize: 24,
