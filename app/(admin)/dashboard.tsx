@@ -1,20 +1,19 @@
-import { ActivityItem } from '@/components/dashboard/ActivityItem';
-import { StatsCard } from '@/components/dashboard/StatsCard';
-import { ActivityLog, DashboardStats, DataService } from '@/services/dataService';
-import { useAuthStore } from '@/store/authStore';
-import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import {
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
   ActivityIndicator,
-  Dimensions,
   Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+  Dimensions,
 } from 'react-native';
+import { useState, useEffect } from 'react';
+import { useAuthStore } from '@/store/authStore';
+import { DataService, DashboardStats, ActivityLog } from '@/services/dataService';
+import { StatsCard } from '@/components/dashboard/StatsCard';
+import { ActivityItem } from '@/components/dashboard/ActivityItem';
 import { BarChart } from 'react-native-chart-kit';
-import Toast from 'react-native-toast-message';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuthStore();
@@ -35,55 +34,11 @@ export default function AdminDashboard() {
       ]);
       setStats(statsData);
       setActivities(activityData);
-      // NEW: Success toast when data loads
-      Toast.show({
-        type: 'success',
-        text1: 'Dashboard Updated',
-        text2: 'Latest data loaded successfully',
-        position: 'top',
-        visibilityTime: 2000,
-      });
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
-      // NEW: Error toast when data fails to load
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to Load Data',
-        text2: 'Please check your connection and try again',
-        position: 'top',
-        visibilityTime: 3000,
-      });
     } finally {
       setLoading(false);
     }
-  };
-
-  // NEW: Logout handler with toast
-  const handleLogout = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Logging Out',
-      text2: 'See you soon!',
-      position: 'top',
-      visibilityTime: 2000,
-    });
-    
-    setTimeout(() => {
-      logout();
-    }, 500);
-  };
-
-  // NEW: Refresh handler with toast
-  const handleRefresh = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Refreshing Dashboard',
-      text2: 'Getting latest data...',
-      position: 'top',
-      visibilityTime: 1500,
-    });
-    
-    fetchDashboardData();
   };
 
   if (loading) {
@@ -97,11 +52,7 @@ export default function AdminDashboard() {
   if (!stats) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>Failed to load dashboard</Text>
-        {/* 👇 NEW: Retry button */}
-        <Pressable onPress={handleRefresh} style={styles.retryButton}>
-          <Text style={styles.retryText}>Retry</Text>
-        </Pressable>
+        <Text>Failed to load dashboard</Text>
       </View>
     );
   }
@@ -114,15 +65,9 @@ export default function AdminDashboard() {
           <Text style={styles.greeting}>Admin Dashboard</Text>
           <Text style={styles.subGreeting}>Welcome back, Administrator</Text>
         </View>
-        {/* 👇 NEW: Header actions with refresh button */}
-        <View style={styles.headerActions}>
-          <Pressable onPress={handleRefresh} style={styles.refreshButton}>
-            <Ionicons name="refresh-outline" size={24} color="#6B7280" />
-          </Pressable>
-          <Pressable onPress={handleLogout} style={styles.logoutButton}>
-            <Ionicons name="log-out-outline" size={24} color="#6B7280" />
-          </Pressable>
-        </View>
+        <Pressable onPress={logout} style={styles.logoutButton}>
+          <Ionicons name="log-out-outline" size={24} color="#6B7280" />
+        </Pressable>
       </View>
 
       {/* Stats Grid */}
@@ -276,36 +221,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
   },
-  // NEW STYLES
-  errorText: {
-    fontSize: 16,
-    color: '#EF4444',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: 'white',
-    fontWeight: '600',
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
-  },
-  // NEW STYLE
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  //  NEW STYLE
-  refreshButton: {
-    padding: 8,
   },
   greeting: {
     fontSize: 24,
