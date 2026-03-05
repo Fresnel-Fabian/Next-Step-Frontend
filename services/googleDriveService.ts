@@ -8,10 +8,13 @@
  *  - Open a file preview in the browser
  *  - Upload a file and optionally open the Drive sharing UI
  *
- * All calls use the OAuth access token stored in authStore.
- * Token is obtained during Google sign-in and saved to AsyncStorage.
+ * Note on architecture: The backend also exposes Drive functionality via
+ * /api/v1/documents endpoints (dataService.ts). Use those for document
+ * management operations (sharing, permissions, "shared with me" sync).
+ * Use this service only for direct Drive browsing / download / upload.
  */
 
+import api from "@/services/api";
 import { DocumentItem } from "@/types/document";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
@@ -74,12 +77,14 @@ const formatDate = (iso?: string): string => {
 };
 
 type DriveDocumentItem = DocumentItem & {
+  // webContentLink from Drive — present only for non-Google-native files (PDF, DOCX, images)
+  webContentLink?: string;
   _modifiedTime?: string;
   _viewedByMeTime?: string;
   _sharedWithMeTime?: string;
 };
 
-// ─── Map raw Drive file → DocumentItem ───────────────────────────────────────
+// ─── Map raw Drive file → DriveDocumentItem ───────────────────────────────────────
 const mapDriveFile = (file: any): DriveDocumentItem => ({
   id: file.id,
   title: file.name,
@@ -90,7 +95,9 @@ const mapDriveFile = (file: any): DriveDocumentItem => ({
   author: file.owners?.[0]?.displayName ?? "Unknown",
   date: formatDate(file.modifiedTime),
   access: file.shared ? "All Staff" : "Only me",
-  url: file.webContentLink ?? file.webViewLink ?? "",
+  // url is the human-readable view link
+  url: file.webViewLink ?? "",
+  webContentLink: file.webContentLink ?? undefined,
   _modifiedTime: file.modifiedTime,
   _viewedByMeTime: file.viewedByMeTime ?? file.modifiedTime,
   _sharedWithMeTime: file.sharedWithMeTime,
@@ -126,14 +133,31 @@ export const sortDocuments = (
   });
 };
 
-// ─── Core API call ────────────────────────────────────────────────────────────
+// ─── Token management ─────────────────────────────────────────────────────────
+async function getValidAccessToken(): Promise<string> {
+  const cached = await AsyncStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
+  try {
+    // Backend verifies and refreshes if expired
+    const response = await api.get<{ access_token: string }>(
+      "/api/v1/auth/drive-token",
+    );
+    const freshToken = response.data.access_token;
+    if (freshToken !== cached) {
+      await AsyncStorage.setItem(GOOGLE_ACCESS_TOKEN_KEY, freshToken);
+    }
+    return freshToken;
+  } catch {
+    if (cached) return cached;
+    throw new Error("Not authenticated with Google. Please sign in again.");
+  }
+}
+
+// ─── Core Drive GET helper ─────────────────────────────────────────────────────
 async function driveGet(
   path: string,
   params: Record<string, string> = {},
 ): Promise<any> {
-  const token = await AsyncStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
-  if (!token)
-    throw new Error("Not authenticated with Google. Please sign in again.");
+  const token = await getValidAccessToken();
 
   const url = new URL(`${DRIVE_API}${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -156,7 +180,7 @@ async function driveGet(
 /**
  * List all Drive files the user can access (My Drive + Shared with me).
  */
-export async function listAllFiles(): Promise<DocumentItem[]> {
+export async function listAllFiles(): Promise<DriveDocumentItem[]> {
   const data = await driveGet("/files", {
     fields: `files(${FILE_FIELDS})`,
     pageSize: "100",
@@ -168,7 +192,7 @@ export async function listAllFiles(): Promise<DocumentItem[]> {
 /**
  * List only files that have been shared with the signed-in user.
  */
-export async function listSharedWithMe(): Promise<DocumentItem[]> {
+export async function listSharedWithMe(): Promise<DriveDocumentItem[]> {
   const data = await driveGet("/files", {
     q: "sharedWithMe=true",
     fields: `files(${FILE_FIELDS})`,
@@ -181,7 +205,7 @@ export async function listSharedWithMe(): Promise<DocumentItem[]> {
 /**
  * List recently viewed files.
  */
-export async function listRecentFiles(): Promise<DocumentItem[]> {
+export async function listRecentFiles(): Promise<DriveDocumentItem[]> {
   const data = await driveGet("/files", {
     fields: `files(${FILE_FIELDS})`,
     pageSize: "20",
@@ -190,9 +214,7 @@ export async function listRecentFiles(): Promise<DocumentItem[]> {
   return (data.files ?? []).map(mapDriveFile);
 }
 
-/**
- * Search files by name keyword.
- */
+/** Search files by name keyword. */
 export async function searchFiles(query: string): Promise<DocumentItem[]> {
   const data = await driveGet("/files", {
     q: `name contains '${query.replace(/'/g, "\\'")}' and trashed=false`,
@@ -203,9 +225,9 @@ export async function searchFiles(query: string): Promise<DocumentItem[]> {
 }
 
 /**
- * Open the file in the system browser for preview.
- * For Google Docs/Sheets/Slides this shows the native Google editor.
- * For PDF/DOCX/etc. it uses the Drive viewer.
+ * Open a file in the system browser for preview.
+ * Google Docs/Sheets/Slides open in the native Google editor.
+ * Other types use the Drive viewer.
  */
 export async function previewFile(item: DocumentItem): Promise<void> {
   const viewUrl = `https://drive.google.com/file/d/${item.id}/view`;
@@ -216,22 +238,22 @@ export async function previewFile(item: DocumentItem): Promise<void> {
 
 /**
  * Download a file to the device cache directory, then open the system share sheet.
- * Works for binary files (PDF, DOCX, XLSX, images).
- * Google native formats (Docs/Sheets) are exported as PDF first.
+ * - Google-native files (Docs, Sheets, Slides): no webContentLink → export as PDF
+ * - Binary files (PDF, DOCX, images):           have webContentLink → direct download
  */
-export async function downloadFile(item: DocumentItem): Promise<void> {
+export async function downloadFile(item: DriveDocumentItem): Promise<void> {
   const token = await AsyncStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
   if (!token) throw new Error("Not authenticated with Google.");
 
-  // Google-native formats need export, others use direct download
-  const isGoogleNative = !item.url || !item.url.includes("webContentLink");
+  const isGoogleNative = !item.webContentLink;
+
   const downloadUrl = isGoogleNative
     ? `${DRIVE_API}/files/${item.id}/export?mimeType=application/pdf`
     : `${DRIVE_API}/files/${item.id}?alt=media`;
 
-  const localPath = `${FileSystem.cacheDirectory}${item.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.${
-    isGoogleNative ? "pdf" : item.type.toLowerCase()
-  }`;
+  const safeName = item.title.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const ext = isGoogleNative ? "pdf" : item.type.toLowerCase();
+  const localPath = `${FileSystem.cacheDirectory}${safeName}.${ext}`;
 
   const downloadResult = await FileSystem.downloadAsync(
     downloadUrl,
@@ -256,8 +278,8 @@ export async function downloadFile(item: DocumentItem): Promise<void> {
 }
 
 /**
- * Open the Drive sharing dialog so the user can change permissions on a file they own.
- * This opens the Drive web UI — there is no in-app sharing dialog in the Drive API.
+ * Open the Drive sharing dialog so the user can change permissions on a file
+ * they own. (Drive has no in-app sharing dialog API — this opens the web UI.)
  */
 export async function openSharingSettings(item: DocumentItem): Promise<void> {
   const url = `https://drive.google.com/file/d/${item.id}/edit?usp=sharing`;
@@ -278,7 +300,7 @@ export async function uploadFile(
   name: string,
   uri: string,
   mimeType: string,
-): Promise<DocumentItem> {
+): Promise<DriveDocumentItem> {
   const token = await AsyncStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
   if (!token) throw new Error("Not authenticated with Google.");
 
