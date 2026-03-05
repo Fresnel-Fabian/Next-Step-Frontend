@@ -1,3 +1,1 @@
-// app/(staff)/schedules.tsx
 export { default } from '@/app/(shared)/schedules';
-

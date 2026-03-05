@@ -121,6 +121,22 @@ export interface CreatePollData {
   expires_at?: string;
 }
 
+export interface VoterDetail {
+  user_id: number;
+  user_name: string;
+  option_id: number;
+  option_text: string;
+  voted_at: string;
+}
+
+export interface PollResults {
+  poll_id: number;
+  title: string;
+  total_votes: number;
+  options: PollOption[];
+  voters: VoterDetail[];
+}
+
 // ============================================
 // Types - Notification
 // ============================================
@@ -136,6 +152,26 @@ export interface Notification {
   sender?: string;
   time?: string;
   read?: boolean;
+}
+
+export interface Announcement {
+  id: number;
+  title: string;
+  message: string;
+  fileUrl?: string;
+  fileName?: string;
+  createdBy: number;
+  createdAt: string;
+  // frontend display
+  time?: string;
+  creatorName?: string;
+}
+
+export interface CreateAnnouncementData {
+  title: string;
+  message: string;
+  file_url?: string;
+  file_name?: string;
 }
 
 // ============================================
@@ -201,6 +237,22 @@ export class DataService {
         id: String(activity.id),
         timestamp: formatRelativeTime(activity.timestamp),
       }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async deleteActivity(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/v1/dashboard/activity/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+static async deleteAllActivity(): Promise<void> {
+    try {
+      await api.delete('/api/v1/dashboard/activity');
     } catch (error) {
       throw handleApiError(error);
     }
@@ -401,6 +453,104 @@ export class DataService {
     }
   }
 
+  static async deletePoll(pollId: number): Promise<void> {
+    try {
+      await api.delete(`/api/v1/polls/${pollId}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getPollResults(pollId: number): Promise<PollResults> {
+    try {
+      const response = await api.get<PollResults>(`/api/v1/polls/${pollId}/results`);
+      return {
+        ...response.data,
+        voters: response.data.voters.map(v => ({
+          ...v,
+          voted_at: formatRelativeTime(v.voted_at),
+        })),
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getAnnouncements(): Promise<Announcement[]> {
+    try {
+      const response = await api.get<Announcement[]>('/api/v1/announcements');
+      return response.data.map(a => ({
+        ...a,
+        time: formatRelativeTime(a.createdAt),
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async createAnnouncement(data: CreateAnnouncementData): Promise<Announcement> {
+    try {
+      const response = await api.post<Announcement>('/api/v1/announcements', data);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async deleteAnnouncement(id: number): Promise<void> {
+    try {
+      await api.delete(`/api/v1/announcements/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  // ========================================
+  // File Upload
+  // ========================================
+
+  static async uploadFile(fileAsset: {
+  uri: string;
+  name: string;
+  type: string;
+  file?: File; // web File object from expo-document-picker
+}): Promise<{ fileUrl: string; fileName: string; fileSize: number }> {
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const token = await AsyncStorage.getItem('auth_token');
+
+    const formData = new FormData();
+
+    if (fileAsset.file) {
+      // Web: expo-document-picker gives us a native File object directly
+      formData.append('file', fileAsset.file, fileAsset.name);
+    } else {
+      // Mobile: fetch the blob from the URI
+      const response = await fetch(fileAsset.uri);
+      const blob = await response.blob();
+      formData.append('file', blob, fileAsset.name);
+    }
+
+    // Use native fetch — NOT axios — so browser sets correct multipart boundary
+    const response = await fetch('http://localhost:8000/api/v1/documents/upload', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Upload failed');
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
   // ========================================
   // Notifications
   // ========================================
@@ -448,6 +598,14 @@ export class DataService {
     }
   }
 
+  static async deleteNotification(id: number): Promise<void> {
+    try {
+      await api.delete(`/api/v1/notifications/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
   // ========================================
   // Users (Admin)
   // ========================================
@@ -472,5 +630,6 @@ export class DataService {
     }
   }
 }
+
 
 export default DataService;
