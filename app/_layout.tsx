@@ -1,4 +1,4 @@
-import { useAuthStore } from '@/store/authStore';
+import { UserRole, useAuthStore } from '@/store/authStore';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import Toast from 'react-native-toast-message';
@@ -8,35 +8,39 @@ export default function RootLayout() {
   const segments = useSegments();
   const { user, isLoading, checkAuth } = useAuthStore();
 
-  // Check auth on mount
   useEffect(() => {
     checkAuth();
   }, []);
 
-  // Handle navigation based on auth state
   useEffect(() => {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inAdminGroup = segments[0] === '(admin)';
     const inStaffGroup = segments[0] === '(staff)';
+    const inStudentGroup = segments[0] === '(student)';
 
-    if (!user && !inAuthGroup) {
-      // Not logged in → go to login
-      router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      // Logged in but on auth screen → redirect to appropriate dashboard
-      if (user.role === 'admin') {
-        router.replace('/(admin)/dashboard');
-      } else {
-        router.replace('/(staff)/dashboard');
+    if (!user) {
+      // Not logged in → always go to login
+      if (!inAuthGroup) {
+        router.replace('/(auth)/login');
       }
+      return;
+    }
+
+    // User is logged in — redirect to correct group if in wrong place
+    if (user.role === UserRole.ADMIN) {
+      if (!inAdminGroup) router.replace('/(admin)/dashboard');
+    } else if (user.role === UserRole.TEACHER) {
+      if (!inStaffGroup) router.replace('/(staff)/dashboard');
+    } else {
+      // STUDENT
+      if (!inStudentGroup) router.replace('/(student)/dashboard');
     }
   }, [user, segments, isLoading]);
 
   if (isLoading) {
-    // Show loading screen while checking auth
-    return null; // Or a proper loading component
+    return null;
   }
 
   return (
@@ -45,9 +49,9 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(admin)" />
         <Stack.Screen name="(staff)" />
+        <Stack.Screen name="(student)" />
       </Stack>
-      <Toast/>
+      <Toast />
     </>
-    
   );
 }

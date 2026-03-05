@@ -1,535 +1,374 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { useState, useEffect } from 'react';
+import { DataService, Poll, PollResults } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
-import { DataService } from '@/services/dataService';
-import { Poll } from '@/types/poll';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Toast from 'react-native-toast-message';
 
-export default function PollsScreen() {
-  const [polls, setPolls] = useState<Poll[]>([]);
-  const [loading, setLoading] = useState(true);
+// ─── Results Modal (same as admin but read-only) ──────────────────────────────
+
+function ResultsModal({
+  pollId,
+  visible,
+  onClose,
+}: {
+  pollId: number | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const [results, setResults] = useState<PollResults | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<'chart' | 'voters'>('chart');
 
   useEffect(() => {
-    fetchPolls();
-  }, []);
+    if (visible && pollId) loadResults(pollId);
+  }, [visible, pollId]);
 
-  const fetchPolls = async () => {
+  const loadResults = async (id: number) => {
     try {
       setLoading(true);
-      const data = await DataService.getPolls();
-      setPolls(data);
-    } catch (error) {
-      console.error('Failed to fetch polls:', error);
+      const data = await DataService.getPollResults(id);
+      setResults(data);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to load results' });
+      onClose();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreatePoll = () => {
-    Alert.alert('Coming Soon', 'Create poll feature');
-  };
-
-  const handleShare = () => {
-    Alert.alert('Share', 'Share poll feature');
-  };
-
-  const handleVote = (pollId: string, optionLabel: string) => {
-    Alert.alert('Vote', `You voted for: ${optionLabel}`);
-    // Update local state to mark as voted
-    setPolls(prev =>
-      prev.map(p => (p.id === pollId ? { ...p, voted: true } : p))
-    );
-  };
-
-  const activePolls = polls.filter(p => p.status === 'active');
-  const completedPolls = polls.filter(p => p.status === 'completed');
-  const votedCount = polls.filter(p => p.voted).length;
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-      </View>
-    );
-  }
-
-  const featuredPoll = activePolls[0];
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Interactive Polls</Text>
-            <Text style={styles.subtitle}>Vote on important decisions</Text>
-          </View>
-          <View style={styles.headerButtons}>
-            <Pressable style={styles.shareButton} onPress={handleShare}>
-              <Ionicons name="share-outline" size={20} color="#374151" />
-            </Pressable>
-            <Pressable style={styles.createButton} onPress={handleCreatePoll}>
-              <Ionicons name="add" size={20} color="white" />
-              <Text style={styles.createButtonText}>Create</Text>
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Poll Results</Text>
+            <Pressable onPress={onClose}>
+              <Ionicons name="close" size={24} color="#6B7280" />
             </Pressable>
           </View>
-        </View>
 
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#F3E8FF' }]}>
-              <Ionicons name="bar-chart-outline" size={24} color="#8B5CF6" />
-            </View>
-            <View>
-              <Text style={styles.statLabel}>Active Polls</Text>
-              <Text style={styles.statValue}>{activePolls.length}</Text>
-            </View>
-          </View>
+          {loading ? (
+            <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 40 }} />
+          ) : results ? (
+            <>
+              <Text style={styles.resultsTitle}>{results.title}</Text>
+              <Text style={styles.resultsMeta}>{results.total_votes} votes total</Text>
 
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
-              <Ionicons name="checkmark-circle-outline" size={24} color="#3B82F6" />
-            </View>
-            <View>
-              <Text style={styles.statLabel}>Your Votes</Text>
-              <Text style={styles.statValue}>{votedCount}</Text>
-            </View>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
-              <Ionicons name="trending-up-outline" size={24} color="#10B981" />
-            </View>
-            <View>
-              <Text style={styles.statLabel}>Participation</Text>
-              <Text style={styles.statValue}>78%</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Featured Active Poll */}
-        {featuredPoll && (
-          <View style={styles.featuredPoll}>
-            <View style={styles.featuredHeader}>
-              <Text style={styles.featuredQuestion}>{featuredPoll.question}</Text>
-              {featuredPoll.voted && (
-                <View style={styles.votedBadge}>
-                  <Ionicons name="checkmark" size={12} color="#059669" />
-                  <Text style={styles.votedBadgeText}>Voted</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.featuredMeta}>
-              <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={16} color="#6B7280" />
-                <Text style={styles.metaText}>{featuredPoll.timeLeft}</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <Ionicons name="people-outline" size={16} color="#6B7280" />
-                <Text style={styles.metaText}>{featuredPoll.totalVotes} votes</Text>
-              </View>
-            </View>
-
-            {/* Results/Options */}
-            <View style={styles.pollOptions}>
-              {featuredPoll.options.map((option, idx) => (
-                <View key={idx} style={styles.pollOption}>
-                  <View style={styles.pollOptionHeader}>
-                    <Text style={styles.pollOptionLabel}>{option.label}</Text>
-                    <Text style={styles.pollOptionVotes}>
-                      {option.votes} votes ({option.percentage}%)
-                    </Text>
-                  </View>
-                  <View style={styles.progressBarContainer}>
-                    <View
-                      style={[
-                        styles.progressBar,
-                        { width: `${option.percentage}%` },
-                      ]}
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            <Text style={styles.featuredCreator}>Created by {featuredPoll.creator}</Text>
-          </View>
-        )}
-
-        {/* Other Active Polls */}
-        {activePolls.length > 1 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>More Active Polls</Text>
-            {activePolls.slice(1).map((poll) => (
-              <View key={poll.id} style={styles.pollCard}>
-                <Text style={styles.pollCardQuestion}>{poll.question}</Text>
-                <Text style={styles.pollCardMeta}>
-                  {poll.timeLeft} • {poll.totalVotes} votes
-                </Text>
-                <View style={styles.pollCardOptions}>
-                  {poll.options.map((option, idx) => (
-                    <Pressable
-                      key={idx}
-                      style={styles.pollCardOption}
-                      onPress={() => !poll.voted && handleVote(poll.id, option.label)}
-                      disabled={poll.voted}
-                    >
-                      <View style={styles.radioButton}>
-                        {poll.voted && idx === 0 && <View style={styles.radioButtonSelected} />}
-                      </View>
-                      <Text style={styles.pollCardOptionText}>{option.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {!poll.voted && (
-                  <Pressable style={styles.voteButton}>
-                    <Text style={styles.voteButtonText}>Submit Vote</Text>
-                  </Pressable>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Completed Polls */}
-        {completedPolls.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Completed Polls</Text>
-            {completedPolls.map((poll) => (
-              <View key={poll.id} style={styles.completedPollCard}>
-                <View style={styles.completedIconContainer}>
-                  <Ionicons name="checkmark-circle" size={24} color="#6B7280" />
-                </View>
-                <View style={styles.completedPollContent}>
-                  <Text style={styles.completedPollQuestion}>{poll.question}</Text>
-                  <Text style={styles.completedPollWinner}>
-                    Winner: {poll.options[0].label}
+              {/* Tab switcher */}
+              <View style={styles.tabRow}>
+                <Pressable
+                  style={[styles.tab, tab === 'chart' && styles.tabActive]}
+                  onPress={() => setTab('chart')}
+                >
+                  <Text style={[styles.tabText, tab === 'chart' && styles.tabTextActive]}>
+                    Results
                   </Text>
-                  <View style={styles.completedPollMeta}>
-                    <Text style={styles.completedPollMetaText}>
-                      {poll.totalVotes} total votes
-                    </Text>
-                    <Text style={styles.completedPollMetaText}>•</Text>
-                    <Text style={styles.completedPollMetaText}>{poll.timeLeft}</Text>
-                  </View>
-                </View>
-                <Pressable>
-                  <Text style={styles.viewButton}>View</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.tab, tab === 'voters' && styles.tabActive]}
+                  onPress={() => setTab('voters')}
+                >
+                  <Text style={[styles.tabText, tab === 'voters' && styles.tabTextActive]}>
+                    Who Voted
+                  </Text>
                 </Pressable>
               </View>
-            ))}
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {tab === 'chart' ? (
+                  <View style={styles.optionResults}>
+                    {results.options.map(opt => (
+                      <View key={opt.id} style={styles.optionResultRow}>
+                        <View style={styles.optionResultHeader}>
+                          <Text style={styles.optionResultText}>{opt.text}</Text>
+                          <Text style={styles.optionResultCount}>
+                            {opt.votes} ({opt.percentage}%)
+                          </Text>
+                        </View>
+                        <View style={styles.barBg}>
+                          <View style={[styles.barFill, { width: `${opt.percentage}%` }]} />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View>
+                    {results.voters.length === 0 ? (
+                      <Text style={styles.emptyText}>No votes yet</Text>
+                    ) : (
+                      results.voters.map((v, i) => (
+                        <View key={i} style={styles.voterRow}>
+                          <View style={styles.voterAvatar}>
+                            <Text style={styles.voterAvatarText}>
+                              {v.user_name.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={styles.voterInfo}>
+                            <Text style={styles.voterName}>{v.user_name}</Text>
+                            <Text style={styles.voterChoice}>Voted: {v.option_text}</Text>
+                          </View>
+                          <Text style={styles.voterTime}>{v.voted_at}</Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                )}
+              </ScrollView>
+            </>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Poll Card (view only) ────────────────────────────────────────────────────
+
+function PollCard({
+  poll,
+  onViewResults,
+}: {
+  poll: Poll;
+  onViewResults: (id: number) => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle} numberOfLines={2}>{poll.title}</Text>
+        <View style={[styles.badge, poll.isActive ? styles.badgeActive : styles.badgeClosed]}>
+          <Text style={[styles.badgeText, poll.isActive ? styles.badgeTextActive : styles.badgeTextClosed]}>
+            {poll.isActive ? 'Active' : 'Closed'}
+          </Text>
+        </View>
+      </View>
+
+      {poll.description && (
+        <Text style={styles.cardDesc}>{poll.description}</Text>
+      )}
+
+      {/* Options preview with percentages */}
+      <View style={styles.optionsPreview}>
+        {poll.options.map(opt => (
+          <View key={opt.id} style={styles.optionRow}>
+            <Text style={styles.optionText}>{opt.text}</Text>
+            <Text style={styles.optionPct}>{opt.percentage}%</Text>
           </View>
-        )}
-      </ScrollView>
+        ))}
+      </View>
+
+      <View style={styles.cardFooter}>
+        <View style={styles.voteCount}>
+          <Ionicons name="people-outline" size={14} color="#6B7280" />
+          <Text style={styles.voteCountText}>{poll.totalVotes} votes</Text>
+        </View>
+        <Text style={styles.timeLeft}>{poll.timeLeft}</Text>
+      </View>
+
+      {/* View results button only */}
+      <Pressable style={styles.resultsBtn} onPress={() => onViewResults(poll.id)}>
+        <Ionicons name="bar-chart-outline" size={16} color="#2563EB" />
+        <Text style={styles.resultsBtnText}>View Results</Text>
+      </Pressable>
     </View>
   );
 }
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function StaffPolls() {
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [resultsId, setResultsId] = useState<number | null>(null);
+  const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+    fetchPolls();
+  }, [filter]);
+
+  const fetchPolls = async () => {
+    try {
+      setLoading(true);
+      const status = filter === 'all' ? undefined : filter;
+      const data = await DataService.getPolls(status as any);
+      setPolls(data);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to load polls' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewResults = (id: number) => {
+    setResultsId(id);
+    setShowResults(true);
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Polls</Text>
+          <Text style={styles.headerSub}>View poll results</Text>
+        </View>
+      </View>
+
+      {/* Filter tabs */}
+      <View style={styles.filterRow}>
+        {(['all', 'active', 'completed'] as const).map(f => (
+          <Pressable
+            key={f}
+            style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+            onPress={() => setFilter(f)}
+          >
+            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 40 }} />
+      ) : polls.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="bar-chart-outline" size={48} color="#D1D5DB" />
+          <Text style={styles.emptyTitle}>No polls yet</Text>
+          <Text style={styles.emptyDesc}>Polls created by admin will appear here</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {polls.map(poll => (
+            <PollCard
+              key={poll.id}
+              poll={poll}
+              onViewResults={handleViewResults}
+            />
+          ))}
+        </ScrollView>
+      )}
+
+      <ResultsModal
+        pollId={resultsId}
+        visible={showResults}
+        onClose={() => {
+          setShowResults(false);
+          setResultsId(null);
+        }}
+      />
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  content: {
-    padding: 16,
-    paddingTop: 60,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 16, paddingTop: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827' },
+  headerSub: { fontSize: 14, color: '#6B7280', marginTop: 2 },
+
+  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
+  filterBtn: {
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E7EB',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+  filterBtnActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  filterText: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  filterTextActive: { color: 'white' },
+
+  list: { padding: 16, paddingTop: 4, gap: 12 },
+
+  card: {
+    backgroundColor: 'white', borderRadius: 12, padding: 16,
+    borderWidth: 1, borderColor: '#F3F4F6',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 8,
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
+  cardTitle: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1 },
+  cardDesc: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
+
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  badgeActive: { backgroundColor: '#D1FAE5' },
+  badgeClosed: { backgroundColor: '#F3F4F6' },
+  badgeText: { fontSize: 11, fontWeight: '600' },
+  badgeTextActive: { color: '#059669' },
+  badgeTextClosed: { color: '#6B7280' },
+
+  optionsPreview: { gap: 8, marginBottom: 12 },
+  optionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  optionText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  optionPct: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
+
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  voteCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  voteCountText: { fontSize: 12, color: '#6B7280' },
+  timeLeft: { fontSize: 12, color: '#6B7280' },
+
+  resultsBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, backgroundColor: '#EFF6FF', paddingVertical: 10, borderRadius: 8,
   },
-  shareButton: {
-    backgroundColor: 'white',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  resultsBtnText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 40 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#374151' },
+  emptyDesc: { fontSize: 14, color: '#6B7280', textAlign: 'center' },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, maxHeight: '90%',
   },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  resultsTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 4 },
+  resultsMeta: { fontSize: 13, color: '#6B7280', marginBottom: 16 },
+
+  tabRow: {
+    flexDirection: 'row', backgroundColor: '#F3F4F6',
+    borderRadius: 8, padding: 4, marginBottom: 16,
   },
-  createButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+  tabActive: { backgroundColor: 'white' },
+  tabText: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  tabTextActive: { color: '#111827', fontWeight: '600' },
+
+  optionResults: { gap: 12 },
+  optionResultRow: { gap: 6 },
+  optionResultHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  optionResultText: { fontSize: 14, color: '#374151', fontWeight: '500' },
+  optionResultCount: { fontSize: 13, color: '#6B7280' },
+  barBg: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: 8, backgroundColor: '#2563EB', borderRadius: 4 },
+
+  voterRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
+  voterAvatar: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#EFF6FF',
+    justifyContent: 'center', alignItems: 'center',
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  featuredPoll: {
-    backgroundColor: 'white',
-    padding: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  featuredHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  featuredQuestion: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    flex: 1,
-    marginRight: 12,
-  },
-  votedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  votedBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  featuredMeta: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 24,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  pollOptions: {
-    gap: 16,
-    marginBottom: 16,
-  },
-  pollOption: {
-    gap: 8,
-  },
-  pollOptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-  },
-  pollOptionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  pollOptionVotes: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  progressBarContainer: {
-    height: 48,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#E9D5FF',
-    borderRadius: 8,
-  },
-  featuredCreator: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 8,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  pollCard: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 16,
-  },
-  pollCardQuestion: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  pollCardMeta: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 12,
-  },
-  pollCardOptions: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  pollCardOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  radioButton: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioButtonSelected: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#8B5CF6',
-  },
-  pollCardOptionText: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  voteButton: {
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  voteButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  completedPollCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-    opacity: 0.85,
-  },
-  completedIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  completedPollContent: {
-    flex: 1,
-  },
-  completedPollQuestion: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  completedPollWinner: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#10B981',
-    marginBottom: 8,
-  },
-  completedPollMeta: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  completedPollMetaText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  viewButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
+  voterAvatarText: { fontSize: 14, fontWeight: '700', color: '#2563EB' },
+  voterInfo: { flex: 1 },
+  voterName: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  voterChoice: { fontSize: 12, color: '#6B7280' },
+  voterTime: { fontSize: 11, color: '#9CA3AF' },
+  emptyText: { textAlign: 'center', color: '#9CA3AF', marginTop: 20 },
 });

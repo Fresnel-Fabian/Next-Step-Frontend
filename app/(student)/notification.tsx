@@ -1,2 +1,1 @@
-// app/(admin)/notification.tsx
 export { default } from '@/app/(shared)/notification';

@@ -1,9 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 
-export default function AdminLayout() {
-  const router = useRouter();
-  
+export default function StaffLayout() {
   return (
     <Tabs
       screenOptions={{
@@ -20,9 +18,27 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="polls"
+        options={{
+          title: 'Polls',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="announcements"
+        options={{
+          title: 'Announce',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="megaphone-outline" size={size} color={color} />
           ),
         }}
       />
@@ -34,12 +50,6 @@ export default function AdminLayout() {
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
         }}
-        listeners={{
-          tabPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/schedules');
-          },
-        }}
       />
       <Tabs.Screen
         name="documents"
@@ -49,11 +59,14 @@ export default function AdminLayout() {
             <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }}
-        listeners={{
-          tabPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/documents');
-          },
+      />
+      <Tabs.Screen
+        name="notification"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -63,27 +76,6 @@ export default function AdminLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" size={size} color={color} />
           ),
-        }}
-        listeners={{
-          tabPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/settings');
-          },
-        }}
-      />
-      <Tabs.Screen
-        name="notification"
-        options={{
-          title: 'Notification',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
-          ),
-        }}
-        listeners={{
-          tabPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/notification');
-          },
         }}
       />
     </Tabs>
