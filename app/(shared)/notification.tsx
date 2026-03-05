@@ -110,9 +110,9 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        {/* <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#111827" />
-        </Pressable>
+        </Pressable> */}
         <View style={styles.headerContent}>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>{unreadCount} unread messages</Text>

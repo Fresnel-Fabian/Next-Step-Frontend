@@ -3,23 +3,25 @@ import { ScheduleItem } from '@/components/dashboard/ScheduleItem';
 import { ActivityLog, DataService, StaffScheduleItem } from '@/services/dataService';
 import { useAuthStore } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
+const POLL_OPTIONS = ['Pizza', 'Salad Bar', 'Pasta'];
+
 export default function StaffDashboard() {
-  const router = useRouter();
   const { user, logout } = useAuthStore();
   const [schedule, setSchedule] = useState<StaffScheduleItem[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPoll, setSelectedPoll] = useState<string | null>(null);
+  const [pollSubmitted, setPollSubmitted] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -50,254 +52,358 @@ export default function StaffDashboard() {
   }
 
   const firstName = user?.name?.split(' ')[0] || 'Staff';
+  const soonCount = schedule.filter((s) => s.isStartingSoon).length;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Good Morning, {firstName}</Text>
+    <View style={styles.wrapper}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
+        {/* Page Header */}
+        <View style={styles.pageHeader}>
+          <Text style={styles.greeting}>Good Morning, {firstName} 👋</Text>
           <Text style={styles.department}>{user?.department || 'Staff Member'}</Text>
         </View>
-        <Pressable onPress={logout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#6B7280" />
-        </Pressable>
-      </View>
 
-      {/* Quick Action Buttons */}
-      <View style={styles.quickActions}>
-        <Pressable style={[styles.quickActionButton, { backgroundColor: '#3B82F6' }]}>
-          <Ionicons name="calendar" size={32} color="white" />
-          <Text style={styles.quickActionText}>My Schedule</Text>
-        </Pressable>
+        {/* Stat Cards — 2×2 grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Today's Shifts</Text>
+              <View style={[styles.statIcon, { backgroundColor: '#3B82F6' }]}>
+                <Ionicons name="calendar" size={18} color="white" />
+              </View>
+            </View>
+            <Text style={styles.statValue}>{schedule.length}</Text>
+            <Text style={styles.statSub}>Scheduled today</Text>
+          </View>
 
-        <Pressable style={[styles.quickActionButton, { backgroundColor: '#10B981' }]}>
-          <Ionicons name="document-text" size={32} color="white" />
-          <Text style={styles.quickActionText}>Documents</Text>
-        </Pressable>
-      </View>
+          <View style={styles.statCard}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Starting Soon</Text>
+              <View style={[styles.statIcon, { backgroundColor: '#EF4444' }]}>
+                <Ionicons name="time" size={18} color="white" />
+              </View>
+            </View>
+            <Text style={styles.statValue}>{soonCount}</Text>
+            <Text style={styles.statSub}>In next 30 min</Text>
+          </View>
 
-      {/* Today's Schedule */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Today's Schedule</Text>
-        <View style={styles.scheduleList}>
-          {schedule.map((item) => (
-            <ScheduleItem
-              key={item.id}
-              time={item.time}
-              title={item.title}
-              location={item.location}
-              isStartingSoon={item.isStartingSoon}
-            />
-          ))}
-        </View>
-      </View>
+          <View style={styles.statCard}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Notifications</Text>
+              <View style={[styles.statIcon, { backgroundColor: '#8B5CF6' }]}>
+                <Ionicons name="notifications" size={18} color="white" />
+              </View>
+            </View>
+            <Text style={styles.statValue}>{activities.length}</Text>
+            <Text style={styles.statSub}>Unread</Text>
+          </View>
 
-      {/* Notifications Widget */}
-      <View style={styles.notificationsCard}>
-        <View style={styles.notificationsHeader}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>2 new</Text>
+          <View style={styles.statCard}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Documents</Text>
+              <View style={[styles.statIcon, { backgroundColor: '#F59E0B' }]}>
+                <Ionicons name="document-text" size={18} color="white" />
+              </View>
+            </View>
+            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statSub}>Added recently</Text>
           </View>
         </View>
-        <View style={styles.notificationsList}>
-          {activities.slice(0, 2).map((activity) => (
-            <ActivityItem
-              key={activity.id}
-              title={activity.title}
-              author={activity.author}
-              timestamp={activity.timestamp}
-            />
-          ))}
-        </View>
-        <Pressable style={styles.viewAllButton}>
-          <Text style={styles.viewAllButtonText}>View All Notifications</Text>
-        </Pressable>
-      </View>
 
-      {/* Active Poll Widget */}
-      <View style={styles.pollCard}>
-        <Text style={styles.sectionTitle}>Active Poll</Text>
-        <Text style={styles.pollQuestion}>What would you prefer for lunch today?</Text>
-        
-        <View style={styles.pollOptions}>
-          {['Pizza', 'Salad Bar', 'Pasta'].map((option) => (
-            <Pressable key={option} style={styles.pollOption}>
-              <View style={styles.radioButton} />
-              <Text style={styles.pollOptionText}>{option}</Text>
+        {/* Today's Schedule */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Today's Schedule</Text>
+          {schedule.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="calendar-outline" size={32} color="#D1D5DB" />
+              <Text style={styles.emptyText}>No shifts scheduled today</Text>
+            </View>
+          ) : (
+            schedule.map((item) => (
+              <ScheduleItem
+                key={item.id}
+                time={item.time}
+                title={item.title}
+                location={item.location}
+                isStartingSoon={item.isStartingSoon}
+              />
+            ))
+          )}
+        </View>
+
+        {/* Notifications */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Notifications</Text>
+            {activities.length > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{activities.length} new</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.card}>
+            {activities.slice(0, 3).map((a) => (
+              <ActivityItem
+                key={a.id}
+                title={a.title}
+                author={a.author}
+                timestamp={a.timestamp}
+              />
+            ))}
+            <Pressable style={styles.viewAllButton}>
+              <Text style={styles.viewAllText}>View All Notifications</Text>
+              <Ionicons name="chevron-forward" size={14} color="#2563EB" />
             </Pressable>
-          ))}
+          </View>
         </View>
 
-        <Pressable style={styles.submitButton}>
-          <Text style={styles.submitButtonText}>Submit Vote</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+        {/* Active Poll */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Active Poll</Text>
+          <View style={styles.card}>
+            {/* Poll header */}
+            <View style={styles.pollHeader}>
+              <View style={styles.pollIconWrap}>
+                <Ionicons name="bar-chart" size={20} color="#8B5CF6" />
+              </View>
+              <Text style={styles.pollQuestion}>
+                What would you prefer for lunch today?
+              </Text>
+            </View>
+
+            {/* Options */}
+            <View style={styles.pollOptions}>
+              {POLL_OPTIONS.map((opt) => {
+                const selected = selectedPoll === opt;
+                return (
+                  <Pressable
+                    key={opt}
+                    style={[styles.pollOption, selected && styles.pollOptionSelected]}
+                    onPress={() => !pollSubmitted && setSelectedPoll(opt)}
+                    disabled={pollSubmitted}
+                  >
+                    <View style={[styles.radio, selected && styles.radioSelected]}>
+                      {selected && <View style={styles.radioDot} />}
+                    </View>
+                    <Text style={[styles.pollOptionText, selected && styles.pollOptionTextSelected]}>
+                      {opt}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {pollSubmitted ? (
+              <View style={styles.votedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                <Text style={styles.votedText}>Vote submitted!</Text>
+              </View>
+            ) : (
+              <Pressable
+                style={[styles.submitButton, !selectedPoll && styles.submitButtonDisabled]}
+                onPress={() => selectedPoll && setPollSubmitted(true)}
+                disabled={!selectedPoll}
+              >
+                <Text style={styles.submitButtonText}>Submit Vote</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F3F4F6',
   },
-  content: {
-    padding: 16,
-  },
+  container: { flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F3F4F6',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
+  pageHeader: { marginBottom: 20 },
   greeting: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  department: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  logoutButton: {
-    padding: 8,
-  },
-  quickActions: {
+  department: { fontSize: 13, color: '#6B7280' },
+
+  // Stats grid
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 24,
   },
-  quickActionButton: {
-    flex: 1,
-    padding: 20,
+  statCard: {
+    backgroundColor: 'white',
     borderRadius: 12,
-    alignItems: 'center',
+    padding: 14,
+    width: '47.5%',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  statLabel: { fontSize: 11, color: '#6B7280', flex: 1, marginRight: 6 },
+  statIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     justifyContent: 'center',
-    gap: 8,
-    height: 112,
+    alignItems: 'center',
   },
-  quickActionText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  section: {
-    marginBottom: 24,
+  statValue: { fontSize: 26, fontWeight: 'bold', color: '#111827' },
+  statSub: { fontSize: 11, color: '#9CA3AF' },
+
+  // Sections
+  section: { marginBottom: 24 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  scheduleList: {
-    gap: 0,
-  },
-  notificationsCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  notificationsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  newBadge: {
+  badge: {
     backgroundColor: '#FEE2E2',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 20,
   },
-  newBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  notificationsList: {
-    marginBottom: 16,
-  },
-  viewAllButton: {
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  viewAllButtonText: {
-    fontSize: 14,
-    color: '#2563EB',
-    fontWeight: '600',
-  },
-  pollCard: {
+  badgeText: { fontSize: 11, fontWeight: '700', color: '#DC2626' },
+
+  // Generic card
+  card: {
     backgroundColor: 'white',
-    padding: 20,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 24,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
-  pollQuestion: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#111827',
+
+  // Empty state
+  emptyCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 28,
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  emptyText: { fontSize: 13, color: '#9CA3AF' },
+
+  // View all
+  viewAllButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 12,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    gap: 4,
+  },
+  viewAllText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+
+  // Poll
+  pollHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
     marginBottom: 16,
   },
-  pollOptions: {
-    gap: 12,
-    marginBottom: 20,
+  pollIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F3F0FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  pollQuestion: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    lineHeight: 20,
+  },
+  pollOptions: { gap: 10, marginBottom: 16 },
   pollOption: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     gap: 12,
   },
-  radioButton: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  pollOptionSelected: {
+    borderColor: '#8B5CF6',
+    backgroundColor: '#F5F3FF',
+  },
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  pollOptionText: {
-    fontSize: 14,
-    color: '#374151',
+  radioSelected: { borderColor: '#8B5CF6' },
+  radioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#8B5CF6',
   },
+  pollOptionText: { fontSize: 14, color: '#374151' },
+  pollOptionTextSelected: { color: '#7C3AED', fontWeight: '600' },
   submitButton: {
     backgroundColor: '#8B5CF6',
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  submitButtonDisabled: { backgroundColor: '#C4B5FD' },
+  submitButtonText: { color: 'white', fontSize: 14, fontWeight: '600' },
+  votedBadge: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
   },
+  votedText: { fontSize: 14, color: '#10B981', fontWeight: '600' },
 });
