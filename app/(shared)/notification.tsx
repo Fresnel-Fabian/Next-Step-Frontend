@@ -4,14 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
 
 type FilterType = 'all' | 'unread' | 'emergency';
 
@@ -30,85 +29,25 @@ export default function NotificationsScreen() {
       setLoading(true);
       const data = await DataService.getNotifications();
       setNotifications(data);
-      // NEW: Success toast with unread count
-      const unreadCount = data.filter(n => !n.read).length;
-      if (unreadCount > 0) {
-        Toast.show({
-          type: 'info',
-          text1: 'Notifications Loaded',
-          text2: `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`,
-          position: 'top',
-          visibilityTime: 2000,
-        });
-      }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
-      // NEW: Error toast
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to Load Notifications',
-        text2: 'Please try again',
-        position: 'top',
-        visibilityTime: 3000,
-      });
     } finally {
       setLoading(false);
     }
   };
 
-  // UPDATED: Mark as read with toast
   const markAsRead = (id: string) => {
     setNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, read: true } : n))
     );
-    
-    Toast.show({
-      type: 'success',
-      text1: 'Marked as Read',
-      text2: 'Notification updated',
-      position: 'top',
-      visibilityTime: 1500,
-    });
   };
 
-  // UPDATED: Mark all as read with toast
   const markAllAsRead = () => {
-  const unreadCount = notifications.filter(n => !n.read).length;
-  
-  if (unreadCount === 0) {
-    Toast.show({
-      type: 'info',
-      text1: 'No Unread Notifications',
-      text2: 'All notifications are already marked as read',
-      position: 'top',
-      visibilityTime: 2000,
-    });
-    return;
-  }
-  
-  // Mark all as read
-  setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  
-  // Show success toast
-  Toast.show({
-    type: 'success',
-    text1: 'All Marked as Read',
-    text2: `${unreadCount} notification${unreadCount > 1 ? 's' : ''} marked`,
-    position: 'top',
-    visibilityTime: 2000,
-  });
-};
-  // UPDATED: Archive with toast
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
   const archiveNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
-    
-    Toast.show({
-      type: 'success',
-      text1: 'Notification Archived',
-      text2: 'Moved to archive',
-      position: 'top',
-      visibilityTime: 1500,
-    });
   };
 
   const getFilteredNotifications = () => {
