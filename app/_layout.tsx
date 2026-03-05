@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 
@@ -7,35 +8,50 @@ export default function RootLayout() {
   const segments = useSegments();
   const { user, isLoading, checkAuth } = useAuthStore();
 
-  // Check auth on mount
   useEffect(() => {
     checkAuth();
   }, []);
 
-  // Handle navigation based on auth state
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const inAuthGroup  = segments[0] === '(auth)';
     const inAdminGroup = segments[0] === '(admin)';
     const inStaffGroup = segments[0] === '(staff)';
 
-    if (!user && !inAuthGroup) {
-      // Not logged in → go to login
-      router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      // Logged in but on auth screen → redirect to appropriate dashboard
-      if (user.role === 'admin') {
-        router.replace('/(admin)/dashboard');
-      } else {
-        router.replace('/(staff)/dashboard');
-      }
+    if (!user) {
+      // Not logged in → always go to login
+      if (!inAuthGroup) router.replace('/(auth)/login');
+      return;
+    }
+
+    const isAdmin = user.role === 'ADMIN';
+
+    if (inAuthGroup) {
+      // Logged in but sitting on auth screen → go to correct dashboard
+      router.replace(isAdmin ? '/(admin)/dashboard' : '/(staff)/dashboard');
+      return;
+    }
+
+    // ✅ KEY FIX: logged in but in the WRONG role group → redirect to correct one
+    if (isAdmin && inStaffGroup) {
+      router.replace('/(admin)/dashboard');
+      return;
+    }
+
+    if (!isAdmin && inAdminGroup) {
+      router.replace('/(staff)/dashboard');
+      return;
     }
   }, [user, segments, isLoading]);
 
+  // Block rendering until auth check is done
   if (isLoading) {
-    // Show loading screen while checking auth
-    return null; // Or a proper loading component
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
   }
 
   return (
