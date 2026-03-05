@@ -1,4 +1,4 @@
-import { DocumentItem } from '@/types/document';
+import type { DocumentItem } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -9,8 +9,9 @@ interface DocumentListItemProps {
 }
 
 export const DocumentListItem = ({ document, onPreview, onDownload }: DocumentListItemProps) => {
+  const type = document.type ?? 'PDF';
   const getDocumentColor = () => {
-    switch (document.type) {
+    switch (type) {
       case 'PDF': return { bg: '#FEE2E2', icon: '#DC2626' };
       case 'DOC': return { bg: '#DBEAFE', icon: '#2563EB' };
       case 'XLS': return { bg: '#FEF3C7', icon: '#D97706' };
@@ -19,7 +20,7 @@ export const DocumentListItem = ({ document, onPreview, onDownload }: DocumentLi
   };
 
   const colors = getDocumentColor();
-  const isAllStaff = document.access === 'All Staff';
+  const isAllStaff = (document.access ?? '') === 'All Staff';
 
   return (
     <View style={styles.container}>
@@ -38,7 +39,7 @@ export const DocumentListItem = ({ document, onPreview, onDownload }: DocumentLi
               styles.accessText,
               { color: isAllStaff ? '#059669' : '#7C3AED' }
             ]}>
-              {document.access}
+              {document.access ?? '—'}
             </Text>
           </View>
         </View>
@@ -46,11 +47,11 @@ export const DocumentListItem = ({ document, onPreview, onDownload }: DocumentLi
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>{document.category}</Text>
           <View style={styles.dot} />
-          <Text style={styles.metaText}>{document.type}</Text>
+          <Text style={styles.metaText}>{type}</Text>
           <View style={styles.dot} />
-          <Text style={styles.metaText}>{document.size}</Text>
+          <Text style={styles.metaText}>{document.size ?? '—'}</Text>
           <View style={styles.dot} />
-          <Text style={styles.metaText}>by {document.author} • {document.date}</Text>
+          <Text style={styles.metaText}>by {document.author ?? '—'} • {document.date ?? '—'}</Text>
         </View>
       </View>
 

@@ -5,7 +5,7 @@
  * Replaces mock data with real API calls to FastAPI backend
  */
 
-import api, { handleApiError } from './api';
+import api, { handleApiError, API_BASE_URL } from './api';
 
 // ============================================
 // Types - Dashboard
@@ -532,7 +532,7 @@ static async deleteAllActivity(): Promise<void> {
     }
 
     // Use native fetch — NOT axios — so browser sets correct multipart boundary
-    const response = await fetch('http://localhost:8000/api/v1/documents/upload', {
+    const response = await fetch(`${API_BASE_URL}api/v1/documents/upload`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

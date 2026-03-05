@@ -1,5 +1,4 @@
-import { DataService } from '@/services/dataService';
-import { ScheduleDTO } from '@/types/schedule';
+import { DataService, type ScheduleDTO } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
