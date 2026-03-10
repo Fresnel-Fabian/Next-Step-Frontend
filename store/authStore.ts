@@ -24,7 +24,8 @@ WebBrowser.maybeCompleteAuthSession();
 export enum UserRole {
   ADMIN = 'ADMIN',
   TEACHER = 'TEACHER',
-  STAFF = 'STAFF',
+  STUDENT = 'STUDENT',
+  STAFF = 'STAFF', // Legacy - maps to TEACHER
 }
 
 export interface User {
