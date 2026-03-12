@@ -1,12 +1,18 @@
 export const GoogleAuthConfig = {
   // Get these from Google Cloud Console
-  webClientId: '53409583700-tfaprlar3erp309kp35k6d6fbd5767g6.apps.googleusercontent.com',
-  iosClientId: '53409583700-lf52gkai0qfvmk0dm1u50ojpl60gpoc4.apps.googleusercontent.com', 
-  androidClientId: '53409583700-4ft6430vf0bibt6pmo29l6nqvbuhhvuv.apps.googleusercontent.com',
-  
-  // OAuth scopes - what info we want from Google
-  scopes: ['profile', 'email'],
-  
-  // Redirect URL for Expo
-  redirectUri: '/dashboard',
+  webClientId:
+    "557054657025-5u9lanne7djbu6e3jlb5kjus6mp6coj6.apps.googleusercontent.com",
+  iosClientId:
+    "557054657025-02eifc6hlsjeaol2g6f7eki6ri4i4lda.apps.googleusercontent.com",
+  androidClientId:
+    "557054657025-nrc534vlripjif58t36p05i8fgkehao2.apps.googleusercontent.com",
+
+  scopes: [
+    "openid",
+    "profile",
+    "email",
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive.install",
+    "https://www.googleapis.com/auth/drive.file",
+  ],
 };

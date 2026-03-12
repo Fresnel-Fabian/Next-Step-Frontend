@@ -1,6 +1,5 @@
 import { DocumentListItem } from '@/components/documents/DocumentListItem';
-import { DataService } from '@/services/dataService';
-import { DocumentItem } from '@/types/document';
+import { DataService, DocumentItem } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {

@@ -57,6 +57,16 @@ export default function AdminDashboard() {
     );
   }
 
+  // Fallback chart data if backend doesn't return it
+  const chartData = stats.chartData ?? [
+    { name: 'Jan', active: 0 },
+    { name: 'Feb', active: 0 },
+    { name: 'Mar', active: 0 },
+    { name: 'Apr', active: 0 },
+    { name: 'May', active: 0 },
+    { name: 'Jun', active: 0 },
+  ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
@@ -77,7 +87,7 @@ export default function AdminDashboard() {
             <StatsCard
               title="Total Staff"
               value={stats.totalStaff}
-              subtitle={stats.staffTrend}
+              subtitle={stats.staffTrend ?? ''}
               icon="people-outline"
               color="#3B82F6"
             />
@@ -86,7 +96,7 @@ export default function AdminDashboard() {
             <StatsCard
               title="Active Schedules"
               value={stats.activeSchedules}
-              subtitle={stats.schedulesTrend}
+              subtitle={stats.schedulesTrend ?? ''}
               icon="calendar-outline"
               color="#10B981"
             />
@@ -98,7 +108,7 @@ export default function AdminDashboard() {
             <StatsCard
               title="Notifications Sent"
               value={stats.notificationsSent}
-              subtitle={stats.notificationsTrend}
+              subtitle={stats.notificationsTrend ?? ''}
               icon="notifications-outline"
               color="#8B5CF6"
             />
@@ -107,7 +117,7 @@ export default function AdminDashboard() {
             <StatsCard
               title="Documents"
               value={stats.totalDocuments}
-              subtitle={stats.documentsTrend}
+              subtitle={stats.documentsTrend ?? ''}
               icon="document-text-outline"
               color="#F59E0B"
             />
@@ -117,7 +127,6 @@ export default function AdminDashboard() {
 
       {/* Main Content Area */}
       <View style={styles.mainContent}>
-        {/* Left Column - Quick Actions & Analytics */}
         <View style={styles.leftColumn}>
           {/* Documents Card */}
           <Pressable style={styles.actionCard}>
@@ -127,7 +136,7 @@ export default function AdminDashboard() {
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Documents</Text>
-                <Text style={styles.actionSubtitle}>48 files pending review</Text>
+                <Text style={styles.actionSubtitle}>{stats.totalDocuments} files total</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -147,14 +156,11 @@ export default function AdminDashboard() {
               </View>
             </View>
 
-            {/* NEW Chart - react-native-chart-kit */}
             <View style={styles.chartContainer}>
               <BarChart
                 data={{
-                  labels: stats.chartData.map(d => d.name),
-                  datasets: [{
-                    data: stats.chartData.map(d => d.active),
-                  }],
+                  labels: chartData.map(d => d.name),
+                  datasets: [{ data: chartData.map(d => d.active) }],
                 }}
                 width={Dimensions.get('window').width - 80}
                 height={160}
@@ -167,15 +173,10 @@ export default function AdminDashboard() {
                   decimalPlaces: 0,
                   color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
                   labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                  style: {
-                    borderRadius: 16,
-                  },
+                  style: { borderRadius: 16 },
                   barPercentage: 0.5,
                 }}
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                }}
+                style={{ marginVertical: 8, borderRadius: 16 }}
                 showValuesOnTopOfBars
                 withInnerLines={false}
               />
@@ -183,7 +184,7 @@ export default function AdminDashboard() {
           </View>
         </View>
 
-        {/* Right Column - Recent Activity */}
+        {/* Recent Activity */}
         <View style={styles.activityCard}>
           <View style={styles.activityHeader}>
             <Text style={styles.activityTitle}>Recent Activity</Text>
@@ -192,14 +193,20 @@ export default function AdminDashboard() {
             </Pressable>
           </View>
           <View style={styles.activityList}>
-            {activities.map((activity) => (
-              <ActivityItem
-                key={activity.id}
-                title={activity.title}
-                author={activity.author}
-                timestamp={activity.timestamp}
-              />
-            ))}
+            {activities.length === 0 ? (
+              <Text style={{ color: '#9CA3AF', textAlign: 'center', paddingVertical: 16 }}>
+                No recent activity
+              </Text>
+            ) : (
+              activities.map((activity) => (
+                <ActivityItem
+                  key={activity.id}
+                  title={activity.title}
+                  author={activity.author}
+                  timestamp={activity.timestamp}
+                />
+              ))
+            )}
           </View>
         </View>
       </View>
@@ -208,143 +215,43 @@ export default function AdminDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  content: {
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  subGreeting: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  logoutButton: {
-    padding: 8,
-  },
-  statsGrid: {
-    marginBottom: 24,
-  },
-  statRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  statHalf: {
-    flex: 1,
-  },
-  mainContent: {
-    gap: 16,
-  },
-  leftColumn: {
-    gap: 16,
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  content: { padding: 16 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  greeting: { fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
+  subGreeting: { fontSize: 14, color: '#6B7280' },
+  logoutButton: { padding: 8 },
+  statsGrid: { marginBottom: 24 },
+  statRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  statHalf: { flex: 1 },
+  mainContent: { gap: 16 },
+  leftColumn: { gap: 16 },
   actionCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', padding: 20, borderRadius: 12, borderWidth: 1,
+    borderColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
-  actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionText: {
-    gap: 2,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  actionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
+  actionHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  actionIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  actionText: { gap: 2 },
+  actionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  actionSubtitle: { fontSize: 14, color: '#6B7280' },
   analyticsCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', padding: 20, borderRadius: 12, borderWidth: 1,
+    borderColor: '#F3F4F6', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
-  analyticsHeader: {
-    marginBottom: 16,
-  },
-  chartContainer: {
-    height: 180,
-    marginTop: 8,
-    alignItems: 'center',
-  },
+  analyticsHeader: { marginBottom: 16 },
+  chartContainer: { height: 180, marginTop: 8, alignItems: 'center' },
   activityCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', padding: 20, borderRadius: 12, borderWidth: 1,
+    borderColor: '#F3F4F6', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
-  activityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  activityTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  viewAllButton: {
-    fontSize: 12,
-    color: '#2563EB',
-    fontWeight: '600',
-  },
-  activityList: {
-    gap: 0,
-  },
+  activityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  activityTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  viewAllButton: { fontSize: 12, color: '#2563EB', fontWeight: '600' },
+  activityList: { gap: 0 },
 });

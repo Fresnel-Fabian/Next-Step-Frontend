@@ -9,8 +9,7 @@ import {
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { DataService } from '@/services/dataService';
-import { Poll } from '@/types/poll';
+import { DataService, Poll } from '@/services/dataService';
 
 export default function PollsScreen() {
   const [polls, setPolls] = useState<Poll[]>([]);
@@ -40,11 +39,11 @@ export default function PollsScreen() {
     Alert.alert('Share', 'Share poll feature');
   };
 
-  const handleVote = (pollId: string, optionLabel: string) => {
+  const handleVote = (pollId: string | number, optionLabel: string) => {
     Alert.alert('Vote', `You voted for: ${optionLabel}`);
     // Update local state to mark as voted
     setPolls(prev =>
-      prev.map(p => (p.id === pollId ? { ...p, voted: true } : p))
+      prev.map(p => (String(p.id) === String(pollId) ? { ...p, voted: true } : p))
     );
   };
 
@@ -180,7 +179,7 @@ export default function PollsScreen() {
                     <Pressable
                       key={idx}
                       style={styles.pollCardOption}
-                      onPress={() => !poll.voted && handleVote(poll.id, option.label)}
+                      onPress={() => !poll.voted && handleVote(poll.id, option.label || option.text || '')}
                       disabled={poll.voted}
                     >
                       <View style={styles.radioButton}>

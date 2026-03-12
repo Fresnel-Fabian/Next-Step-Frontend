@@ -1,4 +1,4 @@
-import { DocumentItem } from '@/types/document';
+import { DocumentItem } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 

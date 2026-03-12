@@ -1,5 +1,4 @@
-import { DataService } from '@/services/dataService';
-import { Notification, NotificationType } from '@/types/notification';
+import { DataService, Notification, NotificationType } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -36,9 +35,9 @@ export default function NotificationsScreen() {
     }
   };
 
-  const markAsRead = (id: string) => {
+  const markAsRead = (id: string | number) => {
     setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
+      prev.map(n => (String(n.id) === String(id) ? { ...n, read: true } : n))
     );
   };
 
@@ -46,8 +45,8 @@ export default function NotificationsScreen() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  const archiveNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const archiveNotification = (id: string | number) => {
+    setNotifications(prev => prev.filter(n => String(n.id) !== String(id)));
   };
 
   const getFilteredNotifications = () => {
@@ -110,9 +109,9 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        {/* <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#111827" />
-        </Pressable>
+        </Pressable> */}
         <View style={styles.headerContent}>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>{unreadCount} unread messages</Text>
