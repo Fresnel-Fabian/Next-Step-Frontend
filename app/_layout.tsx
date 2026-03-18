@@ -25,7 +25,7 @@ export default function RootLayout() {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
       // Logged in but on auth screen → redirect to appropriate dashboard
-      if (user.role === 'admin') {
+      if (user.role === 'ADMIN') {
         router.replace('/(admin)/dashboard');
       } else {
         router.replace('/(staff)/dashboard');

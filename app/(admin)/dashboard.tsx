@@ -1,23 +1,23 @@
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import { ActivityItem } from '@/components/dashboard/ActivityItem';
+import { ScheduleItem } from '@/components/dashboard/ScheduleItem';
+import { ActivityLog, DataService, StaffScheduleItem } from '@/services/dataService';
+import { useAuthStore } from '@/store/authStore';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
   ActivityIndicator,
   Pressable,
-  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import { useState, useEffect } from 'react';
-import { useAuthStore } from '@/store/authStore';
-import { DataService, DashboardStats, ActivityLog } from '@/services/dataService';
-import { StatsCard } from '@/components/dashboard/StatsCard';
-import { ActivityItem } from '@/components/dashboard/ActivityItem';
-import { BarChart } from 'react-native-chart-kit';
-import { Ionicons } from '@expo/vector-icons';
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [schedule, setSchedule] = useState<StaffScheduleItem[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,11 +28,11 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [statsData, activityData] = await Promise.all([
-        DataService.getDashboardStats(),
+      const [scheduleData, activityData] = await Promise.all([
+        DataService.getTodaySchedule(),
         DataService.getRecentActivity(),
       ]);
-      setStats(statsData);
+      setSchedule(scheduleData);
       setActivities(activityData);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
@@ -49,159 +49,90 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!stats) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>Failed to load dashboard</Text>
-      </View>
-    );
-  }
+  const firstName = user?.name?.split(' ')[0] || 'Admin';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Admin Dashboard</Text>
-          <Text style={styles.subGreeting}>Welcome back, Administrator</Text>
+          <Text style={styles.greeting}>Good Morning, {firstName}</Text>
+          <Text style={styles.department}>{user?.department || 'Administrator'}</Text>
         </View>
         <Pressable onPress={logout} style={styles.logoutButton}>
           <Ionicons name="log-out-outline" size={24} color="#6B7280" />
         </Pressable>
       </View>
 
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statRow}>
-          <View style={styles.statHalf}>
-            <StatsCard
-              title="Total Staff"
-              value={stats.totalStaff}
-              subtitle={stats.staffTrend}
-              icon="people-outline"
-              color="#3B82F6"
-            />
-          </View>
-          <View style={styles.statHalf}>
-            <StatsCard
-              title="Active Schedules"
-              value={stats.activeSchedules}
-              subtitle={stats.schedulesTrend}
-              icon="calendar-outline"
-              color="#10B981"
-            />
-          </View>
-        </View>
+      {/* Quick Action Buttons */}
+      <View style={styles.quickActions}>
+        <Pressable style={[styles.quickActionButton, { backgroundColor: '#3B82F6' }]}>
+          <Ionicons name="calendar" size={32} color="white" />
+          <Text style={styles.quickActionText}>My Schedule</Text>
+        </Pressable>
 
-        <View style={styles.statRow}>
-          <View style={styles.statHalf}>
-            <StatsCard
-              title="Notifications Sent"
-              value={stats.notificationsSent}
-              subtitle={stats.notificationsTrend}
-              icon="notifications-outline"
-              color="#8B5CF6"
+        <Pressable style={[styles.quickActionButton, { backgroundColor: '#10B981' }]}>
+          <Ionicons name="document-text" size={32} color="white" />
+          <Text style={styles.quickActionText}>Documents</Text>
+        </Pressable>
+      </View>
+
+      {/* Today's Schedule */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Today's Schedule</Text>
+        <View style={styles.scheduleList}>
+          {schedule.map((item) => (
+            <ScheduleItem
+              key={item.id}
+              time={item.time}
+              title={item.title}
+              location={item.location}
+              isStartingSoon={item.isStartingSoon}
             />
-          </View>
-          <View style={styles.statHalf}>
-            <StatsCard
-              title="Documents"
-              value={stats.totalDocuments}
-              subtitle={stats.documentsTrend}
-              icon="document-text-outline"
-              color="#F59E0B"
-            />
-          </View>
+          ))}
         </View>
       </View>
 
-      {/* Main Content Area */}
-      <View style={styles.mainContent}>
-        {/* Left Column - Quick Actions & Analytics */}
-        <View style={styles.leftColumn}>
-          {/* Documents Card */}
-          <Pressable style={styles.actionCard}>
-            <View style={styles.actionHeader}>
-              <View style={[styles.actionIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="document-text" size={24} color="#10B981" />
-              </View>
-              <View style={styles.actionText}>
-                <Text style={styles.actionTitle}>Documents</Text>
-                <Text style={styles.actionSubtitle}>48 files pending review</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </Pressable>
-
-          {/* Analytics Card */}
-          <View style={styles.analyticsCard}>
-            <View style={styles.analyticsHeader}>
-              <View style={styles.actionHeader}>
-                <View style={[styles.actionIcon, { backgroundColor: '#FED7AA' }]}>
-                  <Ionicons name="bar-chart" size={24} color="#F59E0B" />
-                </View>
-                <View style={styles.actionText}>
-                  <Text style={styles.actionTitle}>Analytics</Text>
-                  <Text style={styles.actionSubtitle}>Activity stats</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* NEW Chart - react-native-chart-kit */}
-            <View style={styles.chartContainer}>
-              <BarChart
-                data={{
-                  labels: stats.chartData.map(d => d.name),
-                  datasets: [{
-                    data: stats.chartData.map(d => d.active),
-                  }],
-                }}
-                width={Dimensions.get('window').width - 80}
-                height={160}
-                yAxisLabel=""
-                yAxisSuffix=""
-                chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                  style: {
-                    borderRadius: 16,
-                  },
-                  barPercentage: 0.5,
-                }}
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                }}
-                showValuesOnTopOfBars
-                withInnerLines={false}
-              />
-            </View>
+      {/* Notifications Widget */}
+      <View style={styles.notificationsCard}>
+        <View style={styles.notificationsHeader}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>2 new</Text>
           </View>
         </View>
+        <View style={styles.notificationsList}>
+          {activities.slice(0, 2).map((activity) => (
+            <ActivityItem
+              key={activity.id}
+              title={activity.title}
+              author={activity.author}
+              timestamp={activity.timestamp}
+            />
+          ))}
+        </View>
+        <Pressable style={styles.viewAllButton}>
+          <Text style={styles.viewAllButtonText}>View All Notifications</Text>
+        </Pressable>
+      </View>
 
-        {/* Right Column - Recent Activity */}
-        <View style={styles.activityCard}>
-          <View style={styles.activityHeader}>
-            <Text style={styles.activityTitle}>Recent Activity</Text>
-            <Pressable>
-              <Text style={styles.viewAllButton}>View All</Text>
+      {/* Active Poll Widget */}
+      <View style={styles.pollCard}>
+        <Text style={styles.sectionTitle}>Active Poll</Text>
+        <Text style={styles.pollQuestion}>What would you prefer for lunch today?</Text>
+
+        <View style={styles.pollOptions}>
+          {['Pizza', 'Salad Bar', 'Pasta'].map((option) => (
+            <Pressable key={option} style={styles.pollOption}>
+              <View style={styles.radioButton} />
+              <Text style={styles.pollOptionText}>{option}</Text>
             </Pressable>
-          </View>
-          <View style={styles.activityList}>
-            {activities.map((activity) => (
-              <ActivityItem
-                key={activity.id}
-                title={activity.title}
-                author={activity.author}
-                timestamp={activity.timestamp}
-              />
-            ))}
-          </View>
+          ))}
         </View>
+
+        <Pressable style={styles.submitButton}>
+          <Text style={styles.submitButtonText}>Submit Vote</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -233,118 +164,140 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 4,
   },
-  subGreeting: {
+  department: {
     fontSize: 14,
     color: '#6B7280',
   },
   logoutButton: {
     padding: 8,
   },
-  statsGrid: {
-    marginBottom: 24,
-  },
-  statRow: {
+  quickActions: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 24,
   },
-  statHalf: {
+  quickActionButton: {
     flex: 1,
-  },
-  mainContent: {
-    gap: 16,
-  },
-  leftColumn: {
-    gap: 16,
-  },
-  actionCard: {
-    backgroundColor: 'white',
     padding: 20,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 8,
+    height: 112,
   },
-  actionText: {
-    gap: 2,
+  quickActionText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  actionTitle: {
-    fontSize: 16,
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#111827',
-  },
-  actionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  analyticsCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  analyticsHeader: {
     marginBottom: 16,
   },
-  chartContainer: {
-    height: 180,
-    marginTop: 8,
-    alignItems: 'center',
+  scheduleList: {
+    gap: 0,
   },
-  activityCard: {
+  notificationsCard: {
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#F3F4F6',
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
-  activityHeader: {
+  notificationsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  activityTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
+  newBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  newBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  notificationsList: {
+    marginBottom: 16,
   },
   viewAllButton: {
-    fontSize: 12,
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  viewAllButtonText: {
+    fontSize: 14,
     color: '#2563EB',
     fontWeight: '600',
   },
-  activityList: {
-    gap: 0,
+  pollCard: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  pollQuestion: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  pollOptions: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  pollOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 12,
+  },
+  radioButton: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+  },
+  pollOptionText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  submitButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
