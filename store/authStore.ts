@@ -25,6 +25,7 @@ export enum UserRole {
   ADMIN = 'ADMIN',
   TEACHER = 'TEACHER',
   STUDENT = 'STUDENT',
+  STAFF = 'STAFF', // Legacy - maps to TEACHER
 }
 
 export interface User {
