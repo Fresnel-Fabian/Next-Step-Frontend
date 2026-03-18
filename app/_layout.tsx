@@ -1,8 +1,8 @@
-import { UserRole } from '@/types/auth';
-import { useAuthStore } from '@/store/authStore';
-import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
-import Toast from 'react-native-toast-message';
+import { UserRole } from '@/types/auth';
+import { ActivityIndicator, View } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { useAuthStore } from '@/store/authStore';
 
 export default function RootLayout() {
   const router = useRouter();
