@@ -1,11 +1,14 @@
-// services/dataService.ts
 /**
  * Data Service - API calls for all data operations
- * 
- * Replaces mock data with real API calls to FastAPI backend
  */
 
-import api, { handleApiError } from './api';
+import { CreateDocumentData, DocumentItem } from "@/types/document";
+import api, { handleApiError } from "./api";
+
+// ============================================
+// Re-export DocumentItem so existing imports work
+// ============================================
+export type { CreateDocumentData, DocumentItem };
 
 // ============================================
 // Types - Dashboard
@@ -51,6 +54,14 @@ export interface ScheduleDTO {
   lastUpdated: string;
 }
 
+export interface StaffScheduleItem {
+  id: string;
+  time: string;
+  title: string;
+  location: string;
+  isStartingSoon: boolean;
+}
+
 export interface CreateScheduleData {
   department: string;
   class_count: number;
@@ -63,35 +74,6 @@ export interface UpdateScheduleData {
   class_count?: number;
   staff_count?: number;
   status?: string;
-}
-
-// ============================================
-// Types - Document
-// ============================================
-
-export interface DocumentItem {
-  id: string;
-  title: string;
-  category: string;
-  description?: string;
-  fileUrl: string;
-  fileSize: number;
-  uploadedBy: number;
-  createdAt: string;
-  // Frontend display fields (computed)
-  type?: string;
-  size?: string;
-  author?: string;
-  date?: string;
-  access?: string;
-}
-
-export interface CreateDocumentData {
-  title: string;
-  category: string;
-  description?: string;
-  file_url: string;
-  file_size: number;
 }
 
 // ============================================
@@ -114,11 +96,10 @@ export interface Poll {
   totalVotes: number;
   createdAt: string;
   expiresAt?: string;
-  // Frontend display fields
   question?: string;
   creator?: string;
   timeLeft?: string;
-  status?: 'active' | 'completed';
+  status?: "active" | "completed";
   voted?: boolean;
 }
 
@@ -137,10 +118,9 @@ export interface Notification {
   id: number;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: "info" | "success" | "warning" | "error";
   isRead: boolean;
   createdAt: string;
-  // Frontend display fields
   sender?: string;
   time?: string;
   read?: boolean;
@@ -150,7 +130,6 @@ export interface Notification {
 // Helper Functions
 // ============================================
 
-// Format date to relative time (e.g., "2 hours ago")
 const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
@@ -158,20 +137,56 @@ const formatRelativeTime = (dateString: string): string => {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
-  
-  if (diffMins < 1) return 'Just now';
+
+  if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins} minutes ago`;
   if (diffHours < 24) return `${diffHours} hours ago`;
   if (diffDays < 7) return `${diffDays} days ago`;
   return date.toLocaleDateString();
 };
 
-// Format file size (bytes to human readable)
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+const inferFileType = (url: string): DocumentItem["type"] => {
+  const ext = url.split(".").pop()?.toUpperCase();
+  if (ext === "PDF") return "PDF";
+  if (ext === "DOC" || ext === "DOCX") return "DOC";
+  if (ext === "XLS" || ext === "XLSX") return "XLS";
+  return "FILE";
+};
+
+// ============================================
+// Raw API shape returned by backend
+// ============================================
+interface RawDocumentItem {
+  id: string | number;
+  title: string;
+  category: string;
+  description: string;
+  url: string;
+  fileSize: number;
+  uploadedBy: number;
+  uploadedByName?: string;
+  createdAt: string;
+  accessLevel?: string;
+}
+
+const mapDocument = (doc: RawDocumentItem): DocumentItem => ({
+  id: String(doc.id),
+  title: doc.title,
+  category: doc.category,
+  description: doc.description,
+  type: inferFileType(doc.url),
+  size: formatFileSize(doc.fileSize),
+  author: doc.uploadedByName || `User #${doc.uploadedBy}`,
+  date: formatRelativeTime(doc.createdAt),
+  access: doc.accessLevel || "All Staff",
+  url: doc.url,
+});
 
 // ============================================
 // Data Service Class
@@ -181,16 +196,16 @@ export class DataService {
   // ========================================
   // Dashboard
   // ========================================
-  
+
   static async getDashboardStats(): Promise<DashboardStats> {
     try {
-      const response = await api.get<DashboardStats>('/api/v1/dashboard/stats');
+      const response = await api.get<DashboardStats>("/api/v1/dashboard/stats");
       return {
         ...response.data,
-        // Add default trends if not provided by backend
-        schedulesTrend: response.data.schedulesTrend || 'Updated recently',
-        notificationsTrend: response.data.notificationsTrend || 'this week',
-        documentsTrend: response.data.documentsTrend || 'added recently',
+        schedulesTrend: response.data.schedulesTrend || "Updated recently",
+        notificationsTrend: response.data.notificationsTrend || "this week",
+        documentsTrend: response.data.documentsTrend || "added recently",
+        chartData: response.data.chartData || [],
       };
     } catch (error) {
       throw handleApiError(error);
@@ -217,12 +232,13 @@ export class DataService {
 
   static async getRecentActivity(limit: number = 20): Promise<ActivityLog[]> {
     try {
-      const response = await api.get<ActivityLog[]>('/api/v1/dashboard/activity', {
-        params: { limit },
-      });
-      
-      // Format timestamps for display
-      return response.data.map(activity => ({
+      const response = await api.get<ActivityLog[]>(
+        "/api/v1/dashboard/activity",
+        {
+          params: { limit },
+        },
+      );
+      return response.data.map((activity) => ({
         ...activity,
         id: String(activity.id),
         timestamp: formatRelativeTime(activity.timestamp),
@@ -236,17 +252,36 @@ export class DataService {
   // Schedules
   // ========================================
 
-  static async getSchedules(search?: string, status?: string): Promise<ScheduleDTO[]> {
+  static async getSchedules(
+    search?: string,
+    status?: string,
+  ): Promise<ScheduleDTO[]> {
     try {
-      const response = await api.get<ScheduleDTO[]>('/api/v1/schedules', {
+      const response = await api.get<ScheduleDTO[]>("/api/v1/schedules", {
         params: { search, status },
       });
-      
-      // Format for frontend display
-      return response.data.map(schedule => ({
+      return response.data.map((schedule) => ({
         ...schedule,
         id: String(schedule.id),
         lastUpdated: formatRelativeTime(schedule.lastUpdated),
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  /**
+   * Returns today's schedule items for the logged-in staff member,
+   * formatted for the StaffScheduleItem component.
+   */
+  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
+    try {
+      const response = await api.get<StaffScheduleItem[]>(
+        "/api/v1/schedules/today",
+      );
+      return response.data.map((item) => ({
+        ...item,
+        id: String(item.id),
       }));
     } catch (error) {
       throw handleApiError(error);
@@ -268,7 +303,7 @@ export class DataService {
 
   static async createSchedule(data: CreateScheduleData): Promise<ScheduleDTO> {
     try {
-      const response = await api.post<ScheduleDTO>('/api/v1/schedules', data);
+      const response = await api.post<ScheduleDTO>("/api/v1/schedules", data);
       return {
         ...response.data,
         id: String(response.data.id),
@@ -279,9 +314,15 @@ export class DataService {
     }
   }
 
-  static async updateSchedule(id: string, data: UpdateScheduleData): Promise<ScheduleDTO> {
+  static async updateSchedule(
+    id: string,
+    data: UpdateScheduleData,
+  ): Promise<ScheduleDTO> {
     try {
-      const response = await api.put<ScheduleDTO>(`/api/v1/schedules/${id}`, data);
+      const response = await api.put<ScheduleDTO>(
+        `/api/v1/schedules/${id}`,
+        data,
+      );
       return {
         ...response.data,
         id: String(response.data.id),
@@ -304,21 +345,15 @@ export class DataService {
   // Documents
   // ========================================
 
-  static async getDocuments(category?: string, search?: string): Promise<DocumentItem[]> {
+  static async getDocuments(
+    category?: string,
+    search?: string,
+  ): Promise<DocumentItem[]> {
     try {
-      const response = await api.get<DocumentItem[]>('/api/v1/documents', {
+      const response = await api.get<RawDocumentItem[]>("/api/v1/documents", {
         params: { category, search },
       });
-      
-      // Format for frontend display
-      return response.data.map(doc => ({
-        ...doc,
-        id: String(doc.id),
-        size: formatFileSize(doc.fileSize),
-        date: formatRelativeTime(doc.createdAt),
-        type: doc.fileUrl.split('.').pop()?.toUpperCase() || 'FILE',
-        access: 'All Staff', // Default, adjust based on your needs
-      }));
+      return response.data.map(mapDocument);
     } catch (error) {
       throw handleApiError(error);
     }
@@ -326,14 +361,10 @@ export class DataService {
 
   static async getDocument(id: string): Promise<DocumentItem> {
     try {
-      const response = await api.get<DocumentItem>(`/api/v1/documents/${id}`);
-      return {
-        ...response.data,
-        id: String(response.data.id),
-        size: formatFileSize(response.data.fileSize),
-        date: formatRelativeTime(response.data.createdAt),
-        type: response.data.fileUrl.split('.').pop()?.toUpperCase() || 'FILE',
-      };
+      const response = await api.get<RawDocumentItem>(
+        `/api/v1/documents/${id}`,
+      );
+      return mapDocument(response.data);
     } catch (error) {
       throw handleApiError(error);
     }
@@ -341,11 +372,14 @@ export class DataService {
 
   static async createDocument(data: CreateDocumentData): Promise<DocumentItem> {
     try {
-      const response = await api.post<DocumentItem>('/api/v1/documents', data);
-      return {
-        ...response.data,
-        id: String(response.data.id),
-      };
+      const response = await api.post<RawDocumentItem>("/api/v1/documents", {
+        title: data.title,
+        category: data.category,
+        description: data.description,
+        file_url: data.fileUrl,
+        file_size: data.fileSize,
+      });
+      return mapDocument(response.data);
     } catch (error) {
       throw handleApiError(error);
     }
@@ -363,14 +397,12 @@ export class DataService {
   // Polls
   // ========================================
 
-  static async getPolls(status?: 'active' | 'completed'): Promise<Poll[]> {
+  static async getPolls(status?: "active" | "completed"): Promise<Poll[]> {
     try {
-      const response = await api.get<Poll[]>('/api/v1/polls', {
+      const response = await api.get<Poll[]>("/api/v1/polls", {
         params: { status },
       });
-      
-      // Format for frontend display
-      return response.data.map(poll => ({
+      return response.data.map((poll) => ({
         ...poll,
         id: String(poll.id),
         question: poll.title,
@@ -399,7 +431,7 @@ export class DataService {
       return {
         ...response.data,
         question: response.data.title,
-        status: response.data.isActive ? 'active' : 'completed',
+        status: response.data.isActive ? "active" : "completed",
       };
     } catch (error) {
       throw handleApiError(error);
@@ -408,7 +440,7 @@ export class DataService {
 
   static async createPoll(data: CreatePollData): Promise<Poll> {
     try {
-      const response = await api.post<Poll>('/api/v1/polls', data);
+      const response = await api.post<Poll>("/api/v1/polls", data);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -417,9 +449,7 @@ export class DataService {
 
   static async votePoll(pollId: number, optionId: number): Promise<void> {
     try {
-      await api.post(`/api/v1/polls/${pollId}/vote`, {
-        option_id: optionId,
-      });
+      await api.post(`/api/v1/polls/${pollId}/vote`, { option_id: optionId });
     } catch (error) {
       throw handleApiError(error);
     }
@@ -437,18 +467,18 @@ export class DataService {
   // Notifications
   // ========================================
 
-  static async getNotifications(unreadOnly: boolean = false): Promise<Notification[]> {
+  static async getNotifications(
+    unreadOnly: boolean = false,
+  ): Promise<Notification[]> {
     try {
-      const response = await api.get<Notification[]>('/api/v1/notifications', {
+      const response = await api.get<Notification[]>("/api/v1/notifications", {
         params: { unread_only: unreadOnly },
       });
-      
-      // Format for frontend display
-      return response.data.map(notif => ({
+      return response.data.map((notif) => ({
         ...notif,
         time: formatRelativeTime(notif.createdAt),
         read: notif.isRead,
-        sender: 'System', // Backend doesn't track sender, you could add it
+        sender: "System",
       }));
     } catch (error) {
       throw handleApiError(error);
@@ -457,7 +487,9 @@ export class DataService {
 
   static async getUnreadCount(): Promise<number> {
     try {
-      const response = await api.get<{ unreadCount: number }>('/api/v1/notifications/unread-count');
+      const response = await api.get<{ unreadCount: number }>(
+        "/api/v1/notifications/unread-count",
+      );
       return response.data.unreadCount;
     } catch (error) {
       throw handleApiError(error);
@@ -474,7 +506,7 @@ export class DataService {
 
   static async markAllNotificationsRead(): Promise<void> {
     try {
-      await api.patch('/api/v1/notifications/read-all');
+      await api.patch("/api/v1/notifications/read-all");
     } catch (error) {
       throw handleApiError(error);
     }
@@ -486,7 +518,7 @@ export class DataService {
 
   static async getUsers(department?: string): Promise<any[]> {
     try {
-      const response = await api.get('/api/v1/users', {
+      const response = await api.get("/api/v1/users", {
         params: { department },
       });
       return response.data;
