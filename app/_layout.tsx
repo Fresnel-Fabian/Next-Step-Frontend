@@ -1,4 +1,5 @@
-import { UserRole, useAuthStore } from '@/store/authStore';
+import { UserRole } from '@/types/auth';
+import { useAuthStore } from '@/store/authStore';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import Toast from 'react-native-toast-message';

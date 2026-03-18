@@ -1,20 +1,27 @@
 // store/authStore.ts
-import api, { ApiError, clearAuthToken, handleApiError, setAuthToken } from '@/services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as WebBrowser from 'expo-web-browser';
-import { create } from 'zustand';
+/**
+ * Authentication Store using Zustand
+ *
+ * Handles:
+ * - Email/password login
+ * - Google OAuth login
+ * - Token management
+ * - User state
+ */
 
+import api, {
+  ApiError,
+  clearAuthToken,
+  handleApiError,
+  setAuthToken,
+} from "@/services/api";
+import { UserRole } from "@/types/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as WebBrowser from "expo-web-browser";
+import { create } from "zustand";
+
+// Required for Google auth to work properly
 WebBrowser.maybeCompleteAuthSession();
-
-// ============================================
-// Types
-// ============================================
-
-export enum UserRole {
-  ADMIN = 'ADMIN',
-  TEACHER = 'TEACHER',   // maps to (staff) screens
-  STUDENT = 'STUDENT',   // maps to (student) screens
-}
 
 export interface User {
   id: string;
@@ -31,11 +38,19 @@ interface AuthResponse {
 }
 
 interface AuthStore {
+  // State
   user: User | null;
   isLoading: boolean;
   error: ApiError | null;
+
+  // Actions
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<void>;
+  // Authenticate with a Google PKCE authorization code.
+  loginWithGoogle: (
+    code: string,
+    code_verifier: string,
+    redirect_uri: string,
+  ) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -55,22 +70,20 @@ interface UpdateProfileData {
   department?: string;
 }
 
-const TOKEN_KEY = 'auth_token';
-const USER_KEY = 'user';
-
-// ============================================
-// Store
-// ============================================
+// Storage keys
+const TOKEN_KEY = "auth_token";
+const USER_KEY = "user";
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   isLoading: true,
   error: null,
 
-  login: async (email: string, password: string) => {
+  // Email/Password Login
+  login: async (email, password) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.post<AuthResponse>('/api/v1/auth/login', {
+      const response = await api.post<AuthResponse>("/api/v1/auth/login", {
         email,
         password,
       });
@@ -85,16 +98,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  loginWithGoogle: async (idToken: string) => {
+  // ── Google PKCE Code Login ────────────────────────────────────────────────
+  loginWithGoogle: async (code, code_verifier, redirect_uri) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.post<AuthResponse>('/api/v1/auth/google', {
-        idToken,
+      // Backend exchanges the code for tokens, verifies identity, creates/finds
+      // the user, and returns our own JWT + user object.
+      const response = await api.post<AuthResponse>("/api/v1/auth/google", {
+        code,
+        code_verifier,
+        redirect_uri,
       });
       const { token, user } = response.data;
       await setAuthToken(token);
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
       set({ user, isLoading: false });
+
     } catch (error) {
       const apiError = handleApiError(error);
       set({ error: apiError, isLoading: false });
@@ -102,10 +121,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  register: async (data: RegisterData) => {
+  register: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      await api.post('/api/v1/auth/register', data);
+      await api.post("/api/v1/auth/register", data);
       await get().login(data.email, data.password);
     } catch (error) {
       const apiError = handleApiError(error);
@@ -114,17 +133,21 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  // Logout
   logout: async () => {
     try {
+      // Clear stored data
       await clearAuthToken();
       await AsyncStorage.removeItem(USER_KEY);
       set({ user: null, error: null });
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
+      // Still clear user state even if storage fails
       set({ user: null });
     }
   },
 
+  // Check Existing Auth (App Startup)
   checkAuth: async () => {
     set({ isLoading: true });
     try {
@@ -133,20 +156,27 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         set({ user: null, isLoading: false });
         return;
       }
-      const response = await api.get<User>('/api/v1/auth/me');
+
+      // Verify token is still valid by calling /me endpoint
+      const response = await api.get<User>("/api/v1/auth/me");
+      // Update stored user with fresh data
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data));
       set({ user: response.data, isLoading: false });
-    } catch (error) {
+    } catch {
       await clearAuthToken();
-      await AsyncStorage.removeItem(USER_KEY);
+      await AsyncStorage.multiRemove([USER_KEY]);
       set({ user: null, isLoading: false });
     }
   },
 
-  updateProfile: async (data: UpdateProfileData) => {
+  // Update Profile
+  updateProfile: async (data) => {
     set({ isLoading: true, error: null });
+
     try {
-      const response = await api.put<User>('/api/v1/users/profile', data);
+      const response = await api.put<User>("/api/v1/users/profile", data);
+
+      // Update stored user
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data));
       set({ user: response.data, isLoading: false });
     } catch (error) {
@@ -156,16 +186,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  clearError: () => {
-    set({ error: null });
-  },
+  clearError: () => set({ error: null }),
 }));
 
-// ============================================
-// Selectors
-// ============================================
-
-export const useUser = () => useAuthStore((state) => state.user);
-export const useIsAuthenticated = () => useAuthStore((state) => !!state.user);
-export const useIsAdmin = () => useAuthStore((state) => state.user?.role === UserRole.ADMIN);
-export const useAuthLoading = () => useAuthStore((state) => state.isLoading);
+// Selectors (for convenience)
+export const useUser = () => useAuthStore((s) => s.user);
+export const useIsAuthenticated = () => useAuthStore((s) => !!s.user);
+export const useIsAdmin = () =>
+  useAuthStore((s) => s.user?.role === UserRole.ADMIN);
+export const useAuthLoading = () => useAuthStore((s) => s.isLoading);
