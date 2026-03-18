@@ -79,11 +79,12 @@ export interface DocumentItem {
   uploadedBy: number;
   createdAt: string;
   // Frontend display fields (computed)
-  type?: string;
+  type: string;
   size?: string;
   author?: string;
   date?: string;
   access?: string;
+  url?: string;
 }
 
 export interface CreateDocumentData {
@@ -99,14 +100,15 @@ export interface CreateDocumentData {
 // ============================================
 
 export interface PollOption {
-  id: number;
-  text: string;
+  id?: number;
+  text?: string;
+  label?: string;
   votes: number;
   percentage: number;
 }
 
 export interface Poll {
-  id: number;
+  id: number | string;
   title: string;
   description?: string;
   options: PollOption[];
@@ -149,11 +151,13 @@ export interface PollResults {
 // Types - Notification
 // ============================================
 
+export type NotificationType = 'emergency' | 'schedule' | 'document' | 'general' | 'info' | 'success' | 'warning' | 'error';
+
 export interface Notification {
-  id: number;
+  id: number | string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: NotificationType;
   isRead: boolean;
   createdAt: string;
   // Frontend display fields
@@ -434,8 +438,8 @@ static async deleteAllActivity(): Promise<void> {
           : (poll.isActive ? 'No expiry' : 'Ended'),
         creator: 'Administrator',
         voted: false,
-        options: (poll.options || []).map((o: { text: string; votes: number; percentage: number }) => ({
-          label: o.text,
+        options: (poll.options || []).map((o: any) => ({
+          label: o.text || o.label || '',
           votes: o.votes,
           percentage: o.percentage,
         })),
