@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 
-export default function AdminLayout() {
+export default function StaffLayout() {
   const router = useRouter();
   
   return (
@@ -84,6 +84,15 @@ export default function AdminLayout() {
             e.preventDefault();
             router.push('/(shared)/notification');
           },
+        }}
+      />
+      <Tabs.Screen
+        name="polls"
+        options={{
+          title: 'Polls',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

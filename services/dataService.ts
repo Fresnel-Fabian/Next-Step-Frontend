@@ -33,6 +33,14 @@ export interface ActivityLog {
   timestamp: string;
 }
 
+export interface StaffScheduleItem {
+  id: string;
+  time: string;
+  title: string;
+  location: string;
+  isStartingSoon: boolean;
+}
+
 // ============================================
 // Types - Schedule
 // ============================================
@@ -201,6 +209,24 @@ export class DataService {
       };
     } catch (error) {
       throw handleApiError(error);
+    }
+  }
+
+  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
+    try {
+      const response = await api.get<ScheduleDTO[]>('/api/v1/schedules', {
+        params: { status: 'Active' },
+      });
+      // Map department schedules to staff schedule items (placeholder format)
+      return (response.data || []).slice(0, 5).map((s, i) => ({
+        id: s.id,
+        time: `${9 + i}:00 AM`,
+        title: s.department,
+        location: 'Room TBD',
+        isStartingSoon: i === 0,
+      }));
+    } catch (error) {
+      return [];
     }
   }
 
@@ -378,17 +404,21 @@ export class DataService {
       });
       return response.data.map((poll) => ({
         ...poll,
+        id: String(poll.id),
         question: poll.title,
-        status: poll.isActive ? "active" : "completed",
+        status: poll.isActive ? 'active' : 'completed',
         timeLeft: poll.expiresAt
-          ? new Date(poll.expiresAt) > new Date()
-            ? `Ends ${formatRelativeTime(poll.expiresAt).replace(" ago", "")}`
-            : `Ended ${formatRelativeTime(poll.expiresAt)}`
-          : poll.isActive
-            ? "No expiry"
-            : "Ended",
-        creator: "Administrator",
+          ? (new Date(poll.expiresAt) > new Date()
+            ? `Ends ${formatRelativeTime(poll.expiresAt).replace(' ago', '')}`
+            : `Ended ${formatRelativeTime(poll.expiresAt)}`)
+          : (poll.isActive ? 'No expiry' : 'Ended'),
+        creator: 'Administrator',
         voted: false,
+        options: (poll.options || []).map((o: { text: string; votes: number; percentage: number }) => ({
+          label: o.text,
+          votes: o.votes,
+          percentage: o.percentage,
+        })),
       }));
     } catch (error) {
       throw handleApiError(error);
