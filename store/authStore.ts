@@ -1,4 +1,3 @@
-// store/authStore.ts
 /**
  * Authentication Store using Zustand
  *
@@ -16,13 +15,23 @@ import api, {
   setAuthToken,
 } from "@/services/api";
 import { GOOGLE_ACCESS_TOKEN_KEY } from "@/services/googleDriveService";
-import { UserRole } from "@/types/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import { create } from "zustand";
 
 // Required for Google auth to work properly
 WebBrowser.maybeCompleteAuthSession();
+
+// ============================================
+// Types
+// ============================================
+
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  TEACHER = 'TEACHER',
+  STUDENT = 'STUDENT',
+  STAFF = 'STAFF', // Legacy - maps to TEACHER
+}
 
 export interface User {
   id: string;
@@ -51,11 +60,10 @@ interface AuthStore {
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
-  // Authenticate with a Google PKCE authorization code.
   loginWithGoogle: (
-    code: string,
-    codeVerifier: string,
-    redirectUri: string,
+    idToken: string,
+    googleUser?: any,
+    accessToken?: string,
   ) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -80,6 +88,10 @@ interface UpdateProfileData {
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "user";
 
+// ============================================
+// Store
+// ============================================
+
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   isLoading: true,
@@ -88,14 +100,19 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   // Email/Password Login
   login: async (email, password) => {
     set({ isLoading: true, error: null });
+
     try {
       const response = await api.post<AuthResponse>("/api/v1/auth/login", {
         email,
         password,
       });
+
       const { token, user } = response.data;
+
+      // Store token and user
       await setAuthToken(token);
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+
       set({ user, isLoading: false });
     } catch (error) {
       const apiError = handleApiError(error);
@@ -104,38 +121,30 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  // ── Google PKCE Code Login ────────────────────────────────────────────────
-  loginWithGoogle: async (code, codeVerifier, redirectUri) => {
+  // ========================================
+  // Google OAuth Login
+  // ========================================
+  loginWithGoogle: async (
+    idToken: string,
+    googleUser?: any,
+    accessToken?: string,
+  ) => {
     set({ isLoading: true, error: null });
+
+    if (accessToken) {
+      await AsyncStorage.setItem(GOOGLE_ACCESS_TOKEN_KEY, accessToken);
+    }
+
     try {
-      // Backend exchanges the code for tokens, verifies identity, creates/finds
-      // the user, and returns our own JWT + user object.
+      // Send Google token to backend for verification
       const response = await api.post<AuthResponse>("/api/v1/auth/google", {
-        code,
-        codeVerifier,
-        redirectUri,
+        idToken,
       });
+
       const { token, user } = response.data;
+      // Store token and user
       await setAuthToken(token);
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
-
-      // Fetch and cache the Drive access token so googleDriveService.ts can use
-      // it immediately without an extra round-trip.
-      // The backend /drive-token endpoint also refreshes the token if needed.
-      try {
-        const driveResp = await api.get<DriveTokenResponse>(
-          "/api/v1/auth/drive-token",
-        );
-        if (driveResp.data.access_token) {
-          await AsyncStorage.setItem(
-            GOOGLE_ACCESS_TOKEN_KEY,
-            driveResp.data.access_token,
-          );
-        }
-      } catch {
-        // Non-fatal: Drive features will re-fetch the token on first use
-      }
-
       set({ user, isLoading: false });
     } catch (error) {
       const apiError = handleApiError(error);
@@ -147,6 +156,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   // Register New User
   register: async (data) => {
     set({ isLoading: true, error: null });
+
     try {
       // Register the user
       await api.post("/api/v1/auth/register", data);
@@ -177,8 +187,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   // Check Existing Auth (App Startup)
   checkAuth: async () => {
     set({ isLoading: true });
+
     try {
       const userData = await AsyncStorage.getItem(USER_KEY);
+
       if (!userData) {
         set({ user: null, isLoading: false });
         return;
@@ -188,10 +200,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const response = await api.get<User>("/api/v1/auth/me");
       // Update stored user with fresh data
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data));
+
       set({ user: response.data, isLoading: false });
-    } catch {
-      await clearAuthToken();
-      await AsyncStorage.multiRemove([USER_KEY, GOOGLE_ACCESS_TOKEN_KEY]);
+    } catch (error) {
+      // Token is invalid or expired
       set({ user: null, isLoading: false });
     }
   },
@@ -205,6 +217,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       // Update stored user
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data));
+
       set({ user: response.data, isLoading: false });
     } catch (error) {
       const apiError = handleApiError(error);
@@ -217,8 +230,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 }));
 
 // Selectors (for convenience)
-export const useUser = () => useAuthStore((s) => s.user);
-export const useIsAuthenticated = () => useAuthStore((s) => !!s.user);
+// ============================================
+
+export const useUser = () => useAuthStore((state) => state.user);
+export const useIsAuthenticated = () => useAuthStore((state) => !!state.user);
 export const useIsAdmin = () =>
-  useAuthStore((s) => s.user?.role === UserRole.ADMIN);
-export const useAuthLoading = () => useAuthStore((s) => s.isLoading);
+  useAuthStore((state) => state.user?.role === UserRole.ADMIN);
+export const useAuthLoading = () => useAuthStore((state) => state.isLoading);

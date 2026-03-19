@@ -10,12 +10,8 @@
 import { GoogleAuthConfig } from "@/config/google-auth";
 import { useAuthStore } from "@/store/authStore";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  makeRedirectUri,
-  ResponseType,
-  useAuthRequest,
-  useAutoDiscovery,
-} from "expo-auth-session";
+import { ResponseType } from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -48,9 +44,13 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const discovery = useAutoDiscovery(GOOGLE_DISCOVERY_URL);
-  const redirectUri = makeRedirectUri({
-    // scheme: "myapp",  // uncomment and set for standalone builds
+  // Google Sign-In setup
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: GoogleAuthConfig.webClientId,
+    iosClientId: GoogleAuthConfig.iosClientId,
+    androidClientId: GoogleAuthConfig.androidClientId,
+    scopes: ["openid", "email", "profile"], // IdToken flow only allows a subset of [openid, email, profile]
+    responseType: ResponseType.IdToken,
   });
 
   // ── Base useAuthRequest (NOT Google.useAuthRequest) ───────────────────────
@@ -74,20 +74,13 @@ export default function LoginScreen() {
   // Handle Google auth response
   useEffect(() => {
     if (response?.type === "success") {
-      const code = response.params.code;
-      const codeVerifier = request?.codeVerifier;
+      const { authentication, params } = response as any;
+      const idToken = params?.id_token ?? authentication?.idToken;
+      const accessToken = params?.access_token ?? authentication?.accessToken;
 
-      if (!code || !codeVerifier) {
-        setError("Google sign-in failed: missing PKCE parameters.");
-        setIsLoading(false);
-        return;
-      }
-
-      handleGoogleSuccess(code, codeVerifier, redirectUri);
+      handleGoogleSuccess(idToken, accessToken);
     } else if (response?.type === "error") {
-      setError(
-        response.error?.message ?? "Google sign-in failed. Please try again.",
-      );
+      setError("Google sign-in failed. Please try again.");
       setIsLoading(false);
     } else if (response?.type === "dismiss") {
       setIsLoading(false);
@@ -95,17 +88,34 @@ export default function LoginScreen() {
   }, [response]);
 
   const handleGoogleSuccess = async (
-    code: string,
-    codeVerifier: string,
-    redirectUri: string,
+    idToken?: string,
+    accessToken?: string,
   ) => {
+    const tokenToSend = idToken || accessToken;
+
+    if (!tokenToSend) {
+      setError("Failed to get authentication token");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // Backend exchanges the code for id_token + access_token + refresh_token,
-      // verifies identity, stores Drive tokens, and returns our own JWT.
-      await loginWithGoogle(code, codeVerifier, redirectUri);
+      // Fetch user info from Google
+      const userInfoResponse = await fetch(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+      );
+      const userData = await userInfoResponse.json();
+
+      // Login with Google — send idToken to backend for verification
+      await loginWithGoogle(tokenToSend, userData, accessToken);
+
+      // Navigation happens automatically via root layout
     } catch (err) {
       console.error("Google auth error:", err);
-      setError("Failed to complete Google sign-in. Please try again.");
+      setError("Failed to complete Google sign-in");
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +133,7 @@ export default function LoginScreen() {
 
     try {
       await login(email, password);
-    } catch {
+    } catch (err) {
       setError("Invalid credentials.");
     } finally {
       setIsLoading(false);
@@ -252,7 +262,7 @@ export default function LoginScreen() {
           <Pressable
             style={[
               styles.googleButton,
-              (!request || !discovery || isLoading) && styles.buttonDisabled,
+              (!request || isLoading) && styles.buttonDisabled,
             ]}
             onPress={handleGoogleLogin}
             disabled={!request || !discovery || isLoading}
@@ -278,9 +288,19 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
-  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 24 },
-  header: { alignItems: "center", marginBottom: 32 },
+  container: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 24,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
   logoContainer: {
     backgroundColor: "#2563EB",
     width: 64,
@@ -296,7 +316,10 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginBottom: 4,
   },
-  subtitle: { fontSize: 14, color: "#6B7280" },
+  subtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
   formContainer: {
     backgroundColor: "white",
     borderRadius: 16,
@@ -318,9 +341,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
   },
-  errorText: { flex: 1, fontSize: 14, color: "#DC2626" },
-  inputGroup: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#DC2626",
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8,
+  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -329,6 +363,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     backgroundColor: "white",
+  },
+  inputIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: "#111827",
+  },
+  forgotPassword: {
+    alignSelf: "flex-end",
+    marginBottom: 16,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: "#2563EB",
+    fontWeight: "600",
   },
   inputIcon: { marginRight: 8 },
   input: { flex: 1, paddingVertical: 12, fontSize: 16, color: "#111827" },
@@ -341,11 +393,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  signInButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
-  buttonDisabled: { opacity: 0.7 },
-  divider: { flexDirection: "row", alignItems: "center", marginVertical: 24 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "#E5E7EB" },
-  dividerText: { marginHorizontal: 16, fontSize: 14, color: "#6B7280" },
+  signInButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E5E7EB",
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: "#6B7280",
+  },
   googleButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -357,7 +427,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 8,
   },
-  googleButtonText: { fontSize: 16, fontWeight: "600", color: "#374151" },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#374151",
+  },
   footerText: {
     textAlign: "center",
     fontSize: 14,

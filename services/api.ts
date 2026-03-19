@@ -13,22 +13,22 @@
  *   Android emulator uses 10.0.2.2 to reach the host machine.
  */
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios, {
-  AxiosError,
-  AxiosInstance,
-  InternalAxiosRequestConfig,
-} from "axios";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { Platform } from 'react-native';
 
 // Configuration
-// Replace with your backend URL
-// For local development:
-// - iOS Simulator: http://localhost:8000
-// - Android Emulator: http://10.0.2.2:8000
-// - Physical device: http://<your-computer-ip>:8000
-const API_BASE_URL = __DEV__
-  ? "http://localhost:8000"
-  : "https://your-production-api.com";
+// ============================================
+
+// Backend URL - Override in config/api.ts for physical device (use your computer's LAN IP)
+import { API_URL as CONFIG_API_URL } from '@/config/api';
+
+const API_PORT = 8000;
+const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+const DEFAULT_DEV_URL = `http://${DEV_HOST}:${API_PORT}/`;
+const API_BASE_URL =
+  CONFIG_API_URL ||
+  (__DEV__ ? DEFAULT_DEV_URL : 'https://your-production-api.com');
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "user";
