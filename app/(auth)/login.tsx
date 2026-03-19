@@ -30,6 +30,10 @@ import {
 // This is required for the auth session to work
 WebBrowser.maybeCompleteAuthSession();
 
+// Google's OIDC discovery document: expo-auth-session reads authorization
+// and token endpoints from here automatically.
+const GOOGLE_DISCOVERY_URL = "https://accounts.google.com";
+
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithGoogle } = useAuthStore();
@@ -48,6 +52,24 @@ export default function LoginScreen() {
     scopes: ["openid", "email", "profile"], // IdToken flow only allows a subset of [openid, email, profile]
     responseType: ResponseType.IdToken,
   });
+
+  // ── Base useAuthRequest (NOT Google.useAuthRequest) ───────────────────────
+  // Using the Google provider's hook causes it to auto-exchange the code for
+  // tokens on the client side, which requires a client_secret that cannot
+  // safely be bundled in a mobile app.
+  //
+  // The base hook just obtains the authorization code and code verifier;
+  // our backend performs the actual token exchange.
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId: GoogleAuthConfig.webClientId,
+      scopes: GoogleAuthConfig.scopes,
+      redirectUri,
+      responseType: ResponseType.Code,
+      usePKCE: true,
+    },
+    discovery,
+  );
 
   // Handle Google auth response
   useEffect(() => {
@@ -99,6 +121,7 @@ export default function LoginScreen() {
     }
   };
 
+  // Email/password login handler
   const handleEmailLogin = async () => {
     if (!email || !password) {
       setError("Please enter both email and password.");
@@ -242,7 +265,7 @@ export default function LoginScreen() {
               (!request || isLoading) && styles.buttonDisabled,
             ]}
             onPress={handleGoogleLogin}
-            disabled={!request || isLoading}
+            disabled={!request || !discovery || isLoading}
           >
             {isLoading && !email ? (
               <ActivityIndicator color="#2563EB" />
@@ -359,6 +382,10 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontWeight: "600",
   },
+  inputIcon: { marginRight: 8 },
+  input: { flex: 1, paddingVertical: 12, fontSize: 16, color: "#111827" },
+  forgotPassword: { alignSelf: "flex-end", marginBottom: 16 },
+  forgotPasswordText: { fontSize: 14, color: "#2563EB", fontWeight: "600" },
   signInButton: {
     backgroundColor: "#2563EB",
     borderRadius: 12,

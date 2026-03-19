@@ -47,6 +47,11 @@ interface AuthResponse {
   user: User;
 }
 
+// /api/v1/auth/drive-token endpoint
+interface DriveTokenResponse {
+  access_token: string;
+}
+
 interface AuthStore {
   // State
   user: User | null;
@@ -92,10 +97,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   isLoading: true,
   error: null,
 
-  // ========================================
   // Email/Password Login
-  // ========================================
-  login: async (email: string, password: string) => {
+  login: async (email, password) => {
     set({ isLoading: true, error: null });
 
     try {
@@ -150,10 +153,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  // ========================================
   // Register New User
-  // ========================================
-  register: async (data: RegisterData) => {
+  register: async (data) => {
     set({ isLoading: true, error: null });
 
     try {
@@ -169,9 +170,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  // ========================================
   // Logout
-  // ========================================
   logout: async () => {
     try {
       // Clear stored data
@@ -185,14 +184,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  // ========================================
   // Check Existing Auth (App Startup)
-  // ========================================
   checkAuth: async () => {
     set({ isLoading: true });
 
     try {
-      // Check for stored user
       const userData = await AsyncStorage.getItem(USER_KEY);
 
       if (!userData) {
@@ -212,10 +208,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  // ========================================
   // Update Profile
-  // ========================================
-  updateProfile: async (data: UpdateProfileData) => {
+  updateProfile: async (data) => {
     set({ isLoading: true, error: null });
 
     try {
@@ -232,15 +226,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  // ========================================
-  // Clear Error
-  // ========================================
-  clearError: () => {
-    set({ error: null });
-  },
+  clearError: () => set({ error: null }),
 }));
 
-// ============================================
 // Selectors (for convenience)
 // ============================================
 

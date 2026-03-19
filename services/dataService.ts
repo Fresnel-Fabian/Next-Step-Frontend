@@ -18,12 +18,12 @@ export interface DashboardStats {
   totalStaff: number;
   staffTrend: string;
   activeSchedules: number;
-  schedulesTrend?: string;
+  schedulesTrend: string;
   notificationsSent: number;
-  notificationsTrend?: string;
+  notificationsTrend: string;
   totalDocuments: number;
-  documentsTrend?: string;
-  chartData?: Array<{ name: string; active: number }>;
+  documentsTrend: string;
+  chartData: Array<{ name: string; active: number }>;
 }
 
 export interface ActivityLog {
@@ -109,10 +109,6 @@ export interface CreatePollData {
   options: Array<{ id: number; text: string }>;
   expires_at?: string;
 }
-
-// ============================================
-// Types - Notification
-// ============================================
 
 export interface Notification {
   id: number;
@@ -385,9 +381,21 @@ export class DataService {
     }
   }
 
-  static async deleteDocument(id: string): Promise<void> {
+  /**
+   * Register a Google Drive file as a document in the app.
+   * The backend sets sharing permissions on the Drive file automatically.
+   *
+   * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create
+   */
+  static async createDocumentFromDrive(
+    data: CreateDriveDocumentData,
+  ): Promise<DocumentItem> {
     try {
-      await api.delete(`/api/v1/documents/${id}`);
+      const response = await api.post<DocumentItem>(
+        "/api/v1/documents/from-drive",
+        data,
+      );
+      return { ...response.data, id: String(response.data.id) };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -425,7 +433,7 @@ export class DataService {
     }
   }
 
-  static async getPoll(id: number): Promise<Poll> {
+  static async deleteDocument(id: string): Promise<void> {
     try {
       const response = await api.get<Poll>(`/api/v1/polls/${id}`);
       return {
