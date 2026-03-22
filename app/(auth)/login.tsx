@@ -24,8 +24,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from "react-native";
+  View
+} from 'react-native';
 
 // This is required for the auth session to work
 WebBrowser.maybeCompleteAuthSession();
@@ -108,10 +108,12 @@ export default function LoginScreen() {
         },
       );
       const userData = await userInfoResponse.json();
+      
+      // Login with Google user data
+      // await loginWithGoogle(idToken, userData);
+      await loginWithGoogle(idToken);
 
-      // Login with Google — send idToken to backend for verification
-      await loginWithGoogle(tokenToSend, userData, accessToken);
-
+      
       // Navigation happens automatically via root layout
     } catch (err) {
       console.error("Google auth error:", err);

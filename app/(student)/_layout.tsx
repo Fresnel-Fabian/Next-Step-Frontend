@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
-export default function AdminLayout() {
+export default function StudentLayout() {
   return (
     <Tabs
       screenOptions={{
@@ -18,7 +18,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid-outline" size={size} color={color} />
           ),
@@ -30,15 +30,6 @@ export default function AdminLayout() {
           title: 'Polls',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bar-chart-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="announcements"
-        options={{
-          title: 'Announce',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="megaphone-outline" size={size} color={color} />
           ),
         }}
       />
@@ -61,15 +52,6 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="notification"
         options={{
           title: 'Notifications',
@@ -79,11 +61,11 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
-        name="polls"
+        name="settings"
         options={{
-          title: 'Polls',
+          title: 'Settings',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bar-chart-outline" size={size} color={color} />
+            <Ionicons name="settings-outline" size={size} color={color} />
           ),
         }}
       />

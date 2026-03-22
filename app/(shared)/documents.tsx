@@ -1,46 +1,25 @@
-import { DocumentListItem } from "@/components/documents/DocumentListItem";
-import {
-  downloadFile,
-  GOOGLE_ACCESS_TOKEN_KEY,
-  listAllFiles,
-  listRecentFiles,
-  listSharedWithMe,
-  openSharingSettings,
-  previewFile,
-  searchFiles,
-  SORT_LABELS,
-  sortDocuments,
-  SortOption,
-  uploadFile,
-} from "@/services/googleDriveService";
-import { DocumentItem } from "@/types/document";
-import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as DocumentPicker from "expo-document-picker";
-import { useEffect, useRef, useState } from "react";
+import { DocumentListItem } from '@/components/documents/DocumentListItem';
+import { DataService } from '@/services/dataService';
+import { DocumentItem } from '@/types/document';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Animated,
-  FlatList,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
-} from "react-native";
+} from 'react-native';
+import Toast from 'react-native-toast-message';
 
-type DriveCategory = "all" | "recent" | "shared with me";
-
-const CATEGORIES: { label: string; value: DriveCategory; icon: string }[] = [
-  { label: "All Files", value: "all", icon: "grid-outline" },
-  { label: "Recent", value: "recent", icon: "time-outline" },
-  { label: "Shared with me", value: "shared with me", icon: "people-outline" },
-];
 
 export default function AdminDocuments() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -69,24 +48,27 @@ export default function AdminDocuments() {
 
   const loadDocuments = async (isRefresh = false) => {
     try {
-      isRefresh ? setRefreshing(true) : setLoading(true);
-      setDriveError(null);
-      setSearch("");
-
-      let data: DocumentItem[];
-      if (selectedCategory === "shared with me") {
-        data = await listSharedWithMe();
-      } else if (selectedCategory === "recent") {
-        data = await listRecentFiles();
-      } else {
-        data = await listAllFiles();
-      }
-
-      setDocuments(sortDocuments(data, sortOption));
-    } catch (err: any) {
-      // Inline error only — never block the full screen
-      setDriveError(err.message || "Failed to load documents");
-      setDocuments([]);
+      setLoading(true);
+      const data = await DataService.getDocuments();
+      setDocuments(data);
+      // NEW: Success toast when documents load
+      Toast.show({
+        type: 'success',
+        text1: 'Documents Loaded',
+        text2: `${data.length} documents available`,
+        position: 'top',
+        visibilityTime: 2000,
+      });
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
+      // NEW: Error toast when fetch fails
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Load Documents',
+        text2: 'Please check your connection',
+        position: 'top',
+        visibilityTime: 3000,
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -126,186 +108,77 @@ export default function AdminDocuments() {
     }
   };
 
-  const handleDownload = async (doc: DocumentItem) => {
-    try {
-      await downloadFile(doc);
-    } catch (err: any) {
-      Alert.alert("Download failed", err.message);
-    }
-  };
-
-  const handleShare = async (doc: DocumentItem) => {
-    try {
-      await openSharingSettings(doc);
-    } catch (err: any) {
-      Alert.alert("Could not open sharing", err.message);
-    }
-  };
-
-  const handleUpload = async () => {
-    const token = await AsyncStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
-    if (!token) {
-      Alert.alert(
-        "Google sign-in required",
-        "Please sign out and sign back in with Google to upload files.",
-      );
-      return;
-    }
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
+  //  UPDATED: Download with toast notification
+  const handleDownload = (doc: DocumentItem) => {
+    console.log('Download:', doc.title);
+    
+    Toast.show({
+      type: 'success',
+      text1: 'Download Started',
+      text2: `Downloading ${doc.title}`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    
+    // TODO: Implement actual download
+    // Simulate download completion after 2 seconds
+    setTimeout(() => {
+      Toast.show({
+        type: 'success',
+        text1: 'Download Complete',
+        text2: `${doc.title} saved to your device`,
+        position: 'top',
+        visibilityTime: 2000,
       });
-      if (result.canceled) return;
-
-      const file = result.assets[0];
-      setUploading(true);
-
-      const uploaded = await uploadFile(
-        file.name,
-        file.uri,
-        file.mimeType ?? "application/octet-stream",
-      );
-
-      // Add to top of list and ask if user wants to open sharing settings
-      setDocuments((prev) => sortDocuments([uploaded, ...prev], sortOption));
-
-      Alert.alert(
-        "Upload successful",
-        `"${file.name}" was uploaded to your Drive. Would you like to set sharing permissions now?`,
-        [
-          { text: "Later", style: "cancel" },
-          { text: "Share now", onPress: () => handleShare(uploaded) },
-        ],
-      );
-    } catch (err: any) {
-      Alert.alert("Upload failed", err.message);
-    } finally {
-      setUploading(false);
-    }
+    }, 2000);
+  };
+  // NEW: Preview handler with toast
+  const handlePreview = (doc: DocumentItem) => {
+    setPreviewDoc(doc);
+    
+    Toast.show({
+      type: 'info',
+      text1: 'Opening Preview',
+      text2: doc.title,
+      position: 'top',
+      visibilityTime: 1500,
+    });
   };
 
-  // ─── Filtered list ────────────────────────────────────────────────────────
-  const displayedDocuments =
-    search.length > 0
-      ? documents.filter((d) =>
-          d.title.toLowerCase().includes(search.toLowerCase()),
-        )
-      : documents;
+  // NEW: Share handler with toast
+  const handleShare = (doc: DocumentItem) => {
+    Toast.show({
+      type: 'success',
+      text1: 'Ready to Share',
+      text2: `${doc.title} can now be shared`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    // TODO: Implement actual share functionality
+  };
 
-  // ─── Header ───────────────────────────────────────────────────────────────
-  const renderHeader = () => (
-    <View>
-      {/* Page title + Upload + Sort */}
-      <View style={styles.pageHeader}>
-        <View>
-          <Text style={styles.pageTitle}>Documents</Text>
-          <Text style={styles.pageSubtitle}>
-            {documents.length} file{documents.length !== 1 ? "s" : ""}
-            {selectedCategory !== "all" ? ` · ${selectedCategory}` : ""}
-          </Text>
-        </View>
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
 
-        <View style={styles.headerActions}>
-          {/* Upload button */}
-          <Pressable
-            style={[styles.uploadButton, uploading && { opacity: 0.6 }]}
-            onPress={handleUpload}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Ionicons name="cloud-upload-outline" size={18} color="white" />
-            )}
-            <Text style={styles.uploadButtonText}>
-              {uploading ? "Uploading…" : "Upload"}
-            </Text>
+  return (
+    <View style={styles.container}>
+      {/* Header - UPDATED */}
+      <View style={styles.header}>
+        {/*  ADD BACK BUTTON */}
+        <View style={styles.headerTop}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
           </Pressable>
-
-          {/* Sort dropdown trigger */}
-          <View>
-            <Pressable
-              style={styles.sortButton}
-              onPress={() => setSortMenuOpen((v) => !v)}
-            >
-              <Ionicons name="funnel-outline" size={16} color="#374151" />
-              <Ionicons
-                name={sortMenuOpen ? "chevron-up" : "chevron-down"}
-                size={14}
-                color="#374151"
-              />
-            </Pressable>
-
-            {/* Dropdown menu */}
-            {sortMenuOpen && (
-              <Animated.View
-                style={[
-                  styles.sortDropdown,
-                  {
-                    opacity: dropdownAnim,
-                    transform: [
-                      {
-                        translateY: dropdownAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-6, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                {(Object.entries(SORT_LABELS) as [SortOption, string][]).map(
-                  ([key, label]) => (
-                    <TouchableOpacity
-                      key={key}
-                      style={[
-                        styles.sortOption,
-                        sortOption === key && styles.sortOptionActive,
-                      ]}
-                      onPress={() => handleSortChange(key)}
-                    >
-                      {sortOption === key && (
-                        <Ionicons
-                          name="checkmark"
-                          size={14}
-                          color="#2563EB"
-                          style={{ marginRight: 6 }}
-                        />
-                      )}
-                      <Text
-                        style={[
-                          styles.sortOptionText,
-                          sortOption === key && styles.sortOptionTextActive,
-                        ]}
-                      >
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  ),
-                )}
-              </Animated.View>
-            )}
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>Document Center</Text>
+            <Text style={styles.subtitle}>Access and manage important documents</Text>
           </View>
         </View>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <Ionicons
-          name="search-outline"
-          size={18}
-          color="#9CA3AF"
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search Drive..."
-          placeholderTextColor="#9CA3AF"
-          value={search}
-          onChangeText={handleSearch}
-          clearButtonMode="while-editing"
-        />
       </View>
 
       {/* Category chips */}
@@ -373,56 +246,94 @@ export default function AdminDocuments() {
             <Text style={styles.retryButtonText}>Try Again</Text>
           </Pressable>
         </View>
-      );
-    }
 
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="cloud-outline" size={52} color="#D1D5DB" />
-        <Text style={styles.emptyTitle}>No documents found</Text>
-        <Text style={styles.emptySubtitle}>
-          {search
-            ? `No Drive files matching "${search}"`
-            : selectedCategory === "shared with me"
-              ? "No files have been shared with you yet"
-              : selectedCategory === "recent"
-                ? "No recently viewed files"
-                : "Upload a file or ask someone to share one with you"}
-        </Text>
-      </View>
-    );
-  };
+        {/* Document List */}
+        <View style={styles.documentList}>
+          {filteredDocuments.map((doc) => (
+            <DocumentListItem
+              key={doc.id}
+              document={doc}
+              onPreview={() => handlePreview(doc)}
+              onDownload={() => handleDownload(doc)}
+            />
+          ))}
+        </View>
+      </ScrollView>
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={styles.loadingText}>Loading from Google Drive…</Text>
-      </View>
-    );
-  }
+      {/* Preview Modal */}
+      <Modal
+        visible={!!previewDoc}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setPreviewDoc(null)}
+      >
+        {previewDoc && (
+          <View style={styles.modalContainer}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Pressable onPress={() => setPreviewDoc(null)} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color="white" />
+                </Pressable>
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  {previewDoc.title}
+                </Text>
+                <View style={styles.modalSizeBadge}>
+                  <Text style={styles.modalSizeText}>{previewDoc.size}</Text>
+                </View>
+              </View>
+              <View style={styles.modalHeaderRight}>
+                <Pressable style={styles.modalIconButton} onPress={() => handleDownload(previewDoc)}>
+                  <Ionicons name="download-outline" size={20} color="white" />
+                </Pressable>
+                <Pressable style={styles.modalIconButton} onPress={() => handleShare(previewDoc)}>
+                  <Ionicons name="share-outline" size={20} color="white" />
+                </Pressable>
+                <Pressable style={styles.modalOpenButton}>
+                  <Text style={styles.modalOpenButtonText}>Open</Text>
+                </Pressable>
+              </View>
+            </View>
 
-  return (
-    <Pressable style={styles.container} onPress={() => setSortMenuOpen(false)}>
-      <FlatList
-        data={displayedDocuments}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <DocumentListItem
-            document={item}
-            onPreview={() => handlePreview(item)}
-            onDownload={() => handleDownload(item)}
-            onDelete={() => handleShare(item)} // Admins manage via Drive sharing
-          />
+            {/* Modal Content */}
+            <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentInner}>
+              <View style={styles.previewDocument}>
+                <Text style={styles.previewTitle}>{previewDoc.title}</Text>
+                <Text style={styles.previewCategory}>{previewDoc.category}</Text>
+
+                <View style={styles.previewTOC}>
+                  <Text style={styles.previewTOCTitle}>Table of Contents - Page 1</Text>
+                  <View style={styles.previewTOCList}>
+                    <View style={styles.previewTOCItem}>
+                      <Text style={styles.previewTOCText}>1. Introduction</Text>
+                      <Text style={styles.previewTOCPage}>Page 1</Text>
+                    </View>
+                    <View style={styles.previewTOCItem}>
+                      <Text style={styles.previewTOCText}>2. Mission and Values</Text>
+                      <Text style={styles.previewTOCPage}>Page 3</Text>
+                    </View>
+                    <View style={styles.previewTOCItem}>
+                      <Text style={styles.previewTOCText}>3. Policies and Procedures</Text>
+                      <Text style={styles.previewTOCPage}>Page 5</Text>
+                    </View>
+                    <View style={styles.previewTOCItem}>
+                      <Text style={styles.previewTOCText}>4. Code of Conduct</Text>
+                      <Text style={styles.previewTOCPage}>Page 8</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.previewNote}>
+                  <Text style={styles.previewNoteText}>
+                    Note: This is a preview of the document. Download the full PDF to view all content and features.
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
         )}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
-        onRefresh={() => loadDocuments(true)}
-        refreshing={refreshing}
-        showsVerticalScrollIndicator={false}
-      />
-    </Pressable>
+      </Modal>
+    </View>
   );
 }
 
@@ -434,31 +345,36 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  header: {
+    padding: 16,
+    paddingTop: 60,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  // ADD THESE NEW STYLES
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
-    padding: 32,
   },
-  loadingText: {
-    fontSize: 14,
-    color: "#6B7280",
+  backButton: {
+    padding: 8,
   },
-  errorText: {
-    fontSize: 14,
-    color: "#EF4444",
-    textAlign: "center",
+  headerContent: {
+    flex: 1,
   },
-  retryButton: {
-    marginTop: 8,
-    backgroundColor: "#2563EB",
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
   },
-  retryButtonText: {
-    color: "white",
-    fontWeight: "600",
+  subtitle: {
     fontSize: 14,
   },
   listContent: {
