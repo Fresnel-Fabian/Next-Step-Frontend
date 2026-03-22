@@ -1,43 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Drawer } from 'expo-router/drawer';
-import { useRouter } from 'expo-router';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
-import { useAuthStore } from '@/store/authStore';
-
-function CustomDrawerContent(props: any) {
-  const { user, logout } = useAuthStore();
-
-  return (
-    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContainer}>
-      {/* Header */}
-      <View style={styles.drawerHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.name?.charAt(0).toUpperCase() ?? 'S'}
-          </Text>
-        </View>
-        <Text style={styles.userName}>{user?.name ?? 'Staff'}</Text>
-        <Text style={styles.userRole}>{user?.role ?? 'Staff'}</Text>
-      </View>
-
-      {/* Nav Items */}
-      <View style={styles.navItems}>
-        <DrawerItemList {...props} />
-      </View>
-
-      {/* Logout at bottom */}
-      <Pressable style={styles.logoutButton} onPress={logout}>
-        <Ionicons name="log-out-outline" size={22} color="#EF4444" />
-        <Text style={styles.logoutText}>Logout</Text>
-      </Pressable>
-    </DrawerContentScrollView>
-  );
-}
+import { Tabs } from 'expo-router';
 
 export default function StaffLayout() {
-  const router = useRouter();
-
   return (
     <Drawer
       drawerContent={(props) => <CustomDrawerContent {...props} />}
@@ -62,25 +26,37 @@ export default function StaffLayout() {
       <Drawer.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
-          drawerIcon: ({ color, size }) => (
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid-outline" size={size} color={color} />
           ),
         }}
       />
-      <Drawer.Screen
+      <Tabs.Screen
+        name="polls"
+        options={{
+          title: 'Polls',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="announcements"
+        options={{
+          title: 'Announce',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="megaphone-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="schedules"
         options={{
           title: 'Schedules',
           drawerIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
-        }}
-        listeners={{
-          drawerItemPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/schedules');
-          },
         }}
       />
       <Drawer.Screen
@@ -91,41 +67,23 @@ export default function StaffLayout() {
             <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }}
-        listeners={{
-          drawerItemPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/documents');
-          },
-        }}
       />
-      <Drawer.Screen
+      <Tabs.Screen
         name="notification"
         options={{
           title: 'Notifications',
-          drawerIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }) => (
             <Ionicons name="notifications-outline" size={size} color={color} />
           ),
         }}
-        listeners={{
-          drawerItemPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/notification');
-          },
-        }}
       />
-      <Drawer.Screen
+      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          drawerIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" size={size} color={color} />
           ),
-        }}
-        listeners={{
-          drawerItemPress: (e) => {
-            e.preventDefault();
-            router.push('/(shared)/settings');
-          },
         }}
       />
       <Drawer.Screen

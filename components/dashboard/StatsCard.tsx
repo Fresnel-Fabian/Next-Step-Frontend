@@ -4,14 +4,14 @@ import { StyleSheet, Text, View } from 'react-native';
 interface StatsCardProps {
   title: string;
   value: string | number;
-  subtitle: string;
+  subtitle?: string;  // ✅ optional — backend may not always return it
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
 }
 
 export const StatsCard = ({ title, value, subtitle, icon, color }: StatsCardProps) => {
-  const isPositive = subtitle.includes('+');
-
+  const isPositive = subtitle?.includes('+') ?? false;
+  
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -20,10 +20,11 @@ export const StatsCard = ({ title, value, subtitle, icon, color }: StatsCardProp
           <Ionicons name={icon} size={20} color="white" />
         </View>
       </View>
-      <Text style={styles.value}>{value}</Text>
-      <Text style={[styles.subtitle, isPositive && styles.positive]}>
-        {subtitle}
-      </Text>
+      {subtitle && (
+        <Text style={[styles.subtitle, isPositive && styles.positive]}>
+          {subtitle}
+        </Text>
+      )}
     </View>
   );
 };

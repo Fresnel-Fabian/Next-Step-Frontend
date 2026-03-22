@@ -1,6 +1,6 @@
 # 📚 Next-Step
 
-A cross-platform staff management application for schools built with React Native and Expo. Next-Step provides administrators and staff members with tools to manage schedules, documents, notifications, polls, and more.
+A cross-platform event management application for schools built with React Native and Expo. Next-Step provides administrators and staff members with tools to manage schedules, documents, notifications, polls, and more.
 
 ![React Native](https://img.shields.io/badge/React_Native-0.76-blue?logo=react)
 ![Expo](https://img.shields.io/badge/Expo-54-black?logo=expo)
@@ -19,19 +19,20 @@ A cross-platform staff management application for schools built with React Nativ
 | Documents | Schedules | Settings |
 |-----------|-----------|----------|
 | ![Docs](docs/screenshots/documents.png) | ![Schedule](docs/screenshots/schedules.png) | ![Settings](docs/screenshots/settings.png) |
--->
 
----
+--- -->
 
 ## ✨ Features
 
 ### Authentication
+
 - ✅ Email/Password login
 - ✅ Google SSO (OAuth 2.0)
 - ✅ Role-based access (Admin/Staff/Student)
 - ✅ Persistent sessions with AsyncStorage
 
 ### Admin Features
+
 - 📊 Dashboard with analytics and charts
 - 👥 Staff management overview
 - 📅 Schedule management (Create, Edit, Delete, Sync)
@@ -40,6 +41,7 @@ A cross-platform staff management application for schools built with React Nativ
 - ⚙️ System settings
 
 ### Staff Features
+
 - 🏠 Personalized dashboard
 - 📅 Today's schedule view
 - 📄 Document access and downloads
@@ -48,6 +50,7 @@ A cross-platform staff management application for schools built with React Nativ
 - ⚙️ Profile and preferences
 
 ### Shared Features
+
 - 🔍 Search and filtering
 - 🌙 Dark mode support (configurable)
 - 🌐 Multi-language support (extensible)
@@ -57,270 +60,37 @@ A cross-platform staff management application for schools built with React Nativ
 
 ## 🛠️ Tech Stack
 
-| Category | Technology |
-|----------|------------|
-| **Framework** | React Native with Expo |
-| **Language** | TypeScript |
-| **Navigation** | Expo Router (file-based) |
-| **State Management** | Zustand |
-| **Storage** | AsyncStorage |
-| **Authentication** | expo-auth-session (Google OAuth) |
-| **Charts** | react-native-chart-kit |
-| **Icons** | @expo/vector-icons (Ionicons) |
-| **Image Picker** | expo-image-picker |
+| Category             | Technology                       |
+| -------------------- | -------------------------------- |
+| **Framework**        | React Native with Expo           |
+| **Language**         | TypeScript                       |
+| **Navigation**       | Expo Router (file-based)         |
+| **State Management** | Zustand                          |
+| **Storage**          | AsyncStorage                     |
+| **Authentication**   | expo-auth-session (Google OAuth) |
+| **Charts**           | react-native-chart-kit           |
+| **Icons**            | @expo/vector-icons (Ionicons)    |
+| **Image Picker**     | expo-image-picker                |
 
 ---
 
-## 📁 Project Structure
-
-```
-next-step/
-├── app/                              # Expo Router screens
-│   ├── (auth)/                       # Authentication screens
-│   │   ├── _layout.tsx              # Auth navigation layout
-│   │   └── login.tsx                # Login screen
-│   ├── (admin)/                      # Admin-only screens
-│   │   ├── _layout.tsx              # Admin tab layout
-│   │   ├── dashboard.tsx            # Admin dashboard
-│   │   ├── schedules.tsx            # Schedule management
-│   │   ├── documents.tsx            # Document management
-│   │   └── settings.tsx             # Placeholder (links to shared)
-│   ├── (staff)/                      # Staff-only screens
-│   │   ├── _layout.tsx              # Staff tab layout
-│   │   ├── dashboard.tsx            # Staff dashboard
-│   │   ├── schedules.tsx            # Schedule view
-│   │   ├── documents.tsx            # Document access
-│   │   ├── polls.tsx                # Polls and voting
-│   │   └── settings.tsx             # Placeholder (links to shared)
-│   ├── (shared)/                     # Shared screens
-│   │   ├── _layout.tsx              # Shared navigation layout
-│   │   ├── settings.tsx             # Settings screen
-│   │   └── notifications.tsx        # Notifications screen
-│   └── _layout.tsx                   # Root layout with auth guard
-├── components/                       # Reusable components
-│   ├── ui/                          # Generic UI components
-│   │   ├── Button.tsx
-│   │   ├── Input.tsx
-│   │   ├── Card.tsx
-│   │   └── Toggle.tsx
-│   ├── dashboard/                   # Dashboard-specific components
-│   │   ├── StatsCard.tsx
-│   │   ├── ActivityItem.tsx
-│   │   └── ScheduleItem.tsx
-│   └── documents/                   # Document-specific components
-│       └── DocumentListItem.tsx
-├── services/                         # API and data services
-│   └── dataService.ts               # Mock data service
-├── store/                            # Zustand stores
-│   └── authStore.ts                 # Authentication state
-├── types/                            # TypeScript definitions
-│   ├── auth.ts
-│   ├── document.ts
-│   ├── notification.ts
-│   ├── poll.ts
-│   └── schedule.ts
-├── config/                           # Configuration files
-│   └── google-auth.ts               # Google OAuth config
-├── assets/                           # Images, fonts, etc.
-│   └── images/
-├── app.json                          # Expo configuration
-├── package.json                      # Dependencies
-├── tsconfig.json                     # TypeScript config
-└── README.md                         # This file
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-| Requirement | Version | Check Command |
-|-------------|---------|---------------|
-| **Node.js** | 18.x or higher | `node --version` |
-| **npm** | 9.x or higher | `npm --version` |
-| **Git** | Any recent | `git --version` |
-| **Expo CLI** | Latest | `npx expo --version` |
-
-#### Optional (for local builds):
-- **Android Studio** - For Android builds
-- **Xcode** - For iOS builds (macOS only)
-- **Java JDK** - For Android builds (`java --version`)
-
----
-
-### Installation
-
-#### 1. Clone the Repository
+## Quick Start
 
 ```bash
 git clone https://github.com/Fresnel-Fabian/Next-Step-Frontend
 cd next-step
-```
-
-#### 2. Install Dependencies
-
-```bash
 npm install
-```
-
-#### 3. Configure Google OAuth (Optional for basic testing)
-
-Create/update the Google OAuth configuration:
-
-```bash
-# Create config directory if it doesn't exist
-mkdir -p config
-```
-
-**File: `config/google-auth.ts`**
-
-```typescript
-export const GoogleAuthConfig = {
-  // Get these from Google Cloud Console
-  webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
-  iosClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
-  androidClientId: 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com',
-  
-  scopes: ['profile', 'email'],
-};
-```
-
-> **Note:** You can skip this step for basic testing. The app will work with email/password login using mock data.
-
-#### 4. Start the Development Server
-
-```bash
 npx expo start
 ```
 
-#### 5. Run the App
+Then press `w` for web, `a` for Android emulator, or `i` for iOS simulator.
 
-Choose your preferred method:
+Test credentials:
 
-| Platform | Command | Requirement |
-|----------|---------|-------------|
-| **Web** | Press `w` | None |
-| **Android Emulator** | Press `a` | Android Studio |
-| **iOS Simulator** | Press `i` | Xcode (macOS only) |
-| **Physical Device** | Scan QR code | Expo Go app |
+- `admin@test.com` / any password → Admin dashboard
+- `staff@test.com` / any password → Staff dashboard
 
----
-
-## 📱 Running on Physical Devices
-
-### Using Expo Go (Recommended for Development)
-
-1. **Install Expo Go** on your device:
-   - [Android (Play Store)](https://play.google.com/store/apps/details?id=host.exp.exponent)
-   - [iOS (App Store)](https://apps.apple.com/app/expo-go/id982107779)
-
-2. **Start the dev server:**
-   ```bash
-   npx expo start
-   ```
-
-3. **Scan the QR code:**
-   - **Android:** Use the Expo Go app to scan
-   - **iOS:** Use the Camera app to scan
-
-4. **Test Login:**
-   - Email: `admin@test.com` → Admin Dashboard
-   - Email: `staff@test.com` → Staff Dashboard
-   - Password: Any value (mock authentication)
-
----
-
-## 🔐 Google OAuth Setup
-
-### Step 1: Create Google Cloud Project
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (e.g., "Next-Step")
-3. Enable the **Google+ API**:
-   - APIs & Services → Library → Search "Google+" → Enable
-
-### Step 2: Create OAuth Credentials
-
-Navigate to **APIs & Services → Credentials → Create Credentials → OAuth client ID**
-
-#### Web Client (Required)
-
-```
-Application type: Web application
-Name: Next-Step Web
-Authorized redirect URIs:
-  - http://localhost:8081
-  - https://auth.expo.io/@YOUR_EXPO_USERNAME/Next-Step
-```
-
-#### Android Client (For Standalone Builds)
-
-```
-Application type: Android
-Name: Next-Step Android
-Package name: com.yourcompany.Next-Step
-SHA-1 certificate fingerprint: [See below]
-```
-
-#### iOS Client (For Standalone Builds)
-
-```
-Application type: iOS
-Name: Next-Step iOS
-Bundle ID: com.yourcompany.Next-Step
-```
-
-### Step 3: Get SHA-1 Fingerprint (Android)
-
-#### For Expo Go Testing:
-
-Use Expo Go's SHA-1 (predefined):
-```
-Package name: host.exp.exponent
-SHA-1: E0:5F:AE:81:8E:17:8D:49:1C:8A:C7:6C:8D:4C:8F:F3:5D:1A:B6:7E
-```
-
-#### For Local/Production Builds:
-
-```bash
-# Debug keystore (development)
-keytool -keystore ~/.android/debug.keystore -list -v -alias androiddebugkey -storepass android
-
-# Production keystore
-keytool -keystore ./your-keystore.keystore -list -v -alias your-alias
-```
-
-### Step 4: Update Configuration
-
-**File: `config/google-auth.ts`**
-
-```typescript
-export const GoogleAuthConfig = {
-  webClientId: 'XXXXXX.apps.googleusercontent.com',
-  iosClientId: 'YYYYYY.apps.googleusercontent.com',
-  androidClientId: 'ZZZZZZ.apps.googleusercontent.com',
-  scopes: ['profile', 'email'],
-};
-```
-
-### Step 5: Update `app.json`
-
-```json
-{
-  "expo": {
-    "scheme": "Next-Step",
-    "ios": {
-      "bundleIdentifier": "com.yourcompany.Next-Step"
-    },
-    "android": {
-      "package": "com.yourcompany.Next-Step"
-    }
-  }
-}
-```
+> For full setup including Google OAuth and physical device testing, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -444,7 +214,7 @@ npx expo run:ios
 |------|-------|----------|--------|
 | Admin | `admin@test.com` | Any | Full admin dashboard |
 | Staff | `staff@test.com` | Any | Staff dashboard |
-| Staff | `teacher@school.edu` | Any | Staff dashboard |
+| Student | `student@school.edu` | Any | Student dashboard |
 
 ### Run Tests (Future)
 
@@ -610,131 +380,54 @@ export const Colors = {
    touch app/(staff)/new-screen.tsx
    ```
 
-2. **Add basic structure:**
-   ```typescript
-   import { View, Text, StyleSheet } from 'react-native';
+Before you begin, ensure you have the following installed:
 
-   export default function NewScreen() {
-     return (
-       <View style={styles.container}>
-         <Text>New Screen</Text>
-       </View>
-     );
-   }
+| Requirement  | Version        | Check Command        |
+| ------------ | -------------- | -------------------- |
+| **Node.js**  | 18.x or higher | `node --version`     |
+| **npm**      | 9.x or higher  | `npm --version`      |
+| **Git**      | Any recent     | `git --version`      |
+| **Expo CLI** | Latest         | `npx expo --version` |
 
-   const styles = StyleSheet.create({
-     container: {
-       flex: 1,
-       backgroundColor: '#F9FAFB',
-     },
-   });
-   ```
+#### Optional (for local builds)
 
-3. **Add to tab navigation** in `_layout.tsx` if needed.
+- **Android Studio** - For Android builds
+- **Xcode** - For iOS builds (macOS only)
+- **Java JDK** - For Android builds (`java --version`)
 
 ---
 
-## 🐛 Troubleshooting
+## Project Structure
 
-### Common Issues
-
-#### "Metro bundler not starting"
-```bash
-# Clear cache and restart
-npx expo start --clear
+```
+app/                     # Expo Router screens
+├── (auth)/              # Login
+├── (admin)/             # Admin-only screens
+├── (staff)/             # Staff-only screens
+├── (shared)/            # Shared screens across roles
+└── _layout.tsx          # Root layout with auth guard
+components/              # Reusable UI components
+services/                # API and data services
+store/                   # Zustand state stores
+types/                   # TypeScript definitions
+config/                  # Configuration files
 ```
 
-#### "Module not found"
-```bash
-# Reinstall dependencies
-rm -rf node_modules
-npm install
-```
+---
 
-#### "Android build fails"
-```bash
-# Clean Android build
-cd android
-./gradlew clean
-cd ..
-npx expo run:android
-```
+## Documentation
 
-#### "Google Sign-In not working"
-1. Check OAuth credentials in Google Cloud Console
-2. Verify package name matches
-3. Ensure SHA-1 is correctly added
-4. Check redirect URIs
-
-#### "Expo Go can't connect"
-1. Ensure device is on same WiFi network
-2. Try tunnel mode: `npx expo start --tunnel`
-3. Check firewall settings
+- [Contributing & Development Setup](CONTRIBUTING.md)
+- [Deployment Guide](docs/deployment.md)
 
 ---
 
-## 📚 Resources
+## License
 
-- [Expo Documentation](https://docs.expo.dev/)
-- [React Native Documentation](https://reactnative.dev/)
-- [Expo Router Guide](https://docs.expo.dev/router/introduction/)
-- [Zustand Documentation](https://zustand-demo.pmnd.rs/)
-- [Google OAuth Setup](https://docs.expo.dev/guides/google-authentication/)
-
----
-
-## 🤝 Contributing
-
-1. **Fork the repository**
-2. **Create a feature branch:**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Commit your changes:**
-   ```bash
-   git commit -m 'Add amazing feature'
-   ```
-4. **Push to the branch:**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-5. **Open a Pull Request**
-
-### Code Style
-
-- Use TypeScript for all new files
-- Follow existing component patterns
-- Use StyleSheet for styling (no inline styles)
-- Add types for all props and state
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - feel free to use this project for learning or commercial purposes.
 
 ---
 
 ## 👥 Authors
 
-- **Fresnel Fabian** - *Initial work* - [GitHub](https://github.com/Fresnel-Fabian)
-
----
-
-## 🙏 Acknowledgments
-
-- [Expo Team](https://expo.dev/) for the amazing framework
-- [React Native Community](https://reactnative.dev/)
-- School administrators and staff who provided feedback
-
----
-
-## 📞 Support
-
-For support, email fabian.f@northeastern.edu or open an issue on GitHub.
-
----
-
-<p align="center">
-  Made with ❤️ using React Native and Expo
-</p>
+- **Fresnel Fabian** - _Initial work_ - [GitHub](https://github.com/Fresnel-Fabian)

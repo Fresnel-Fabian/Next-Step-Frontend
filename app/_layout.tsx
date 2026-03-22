@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { UserRole, useAuthStore } from '@/store/authStore';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { useAuthStore } from '@/store/authStore';
+import { useEffect } from 'react';
+import Toast from 'react-native-toast-message';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -18,47 +18,41 @@ export default function RootLayout() {
     const inAuthGroup  = segments[0] === '(auth)';
     const inAdminGroup = segments[0] === '(admin)';
     const inStaffGroup = segments[0] === '(staff)';
+    const inStudentGroup = segments[0] === '(student)';
 
     if (!user) {
       // Not logged in → always go to login
-      if (!inAuthGroup) router.replace('/(auth)/login');
+      if (!inAuthGroup) {
+        router.replace('/(auth)/login');
+      }
       return;
     }
 
-    const isAdmin = user.role === 'ADMIN';
-
-    if (inAuthGroup) {
-      // Logged in but sitting on auth screen → go to correct dashboard
-      router.replace(isAdmin ? '/(admin)/dashboard' : '/(staff)/dashboard');
-      return;
-    }
-
-    // ✅ KEY FIX: logged in but in the WRONG role group → redirect to correct one
-    if (isAdmin && inStaffGroup) {
-      router.replace('/(admin)/dashboard');
-      return;
-    }
-
-    if (!isAdmin && inAdminGroup) {
-      router.replace('/(staff)/dashboard');
-      return;
+    // User is logged in — redirect to correct group if in wrong place
+    if (user.role === UserRole.ADMIN) {
+      if (!inAdminGroup) router.replace('/(admin)/dashboard');
+    } else if (user.role === UserRole.TEACHER) {
+      if (!inStaffGroup) router.replace('/(staff)/dashboard');
+    } else {
+      // STUDENT
+      if (!inStudentGroup) router.replace('/(student)/dashboard');
     }
   }, [user, segments, isLoading]);
 
   // Block rendering until auth check is done
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
-    );
+    return null;
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(admin)" />
-      <Stack.Screen name="(staff)" />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(admin)" />
+        <Stack.Screen name="(staff)" />
+        <Stack.Screen name="(student)" />
+      </Stack>
+      <Toast />
+    </>
   );
 }
