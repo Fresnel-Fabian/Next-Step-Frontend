@@ -15,7 +15,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const inAuthGroup  = segments[0] === '(auth)';
     const inAdminGroup = segments[0] === '(admin)';
     const inStaffGroup = segments[0] === '(staff)';
     const inStudentGroup = segments[0] === '(student)';
@@ -39,6 +39,7 @@ export default function RootLayout() {
     }
   }, [user, segments, isLoading]);
 
+  // Block rendering until auth check is done
   if (isLoading) {
     return null;
   }

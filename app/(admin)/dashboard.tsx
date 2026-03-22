@@ -105,6 +105,16 @@ const handleClearAll = async () => {
     );
   }
 
+  // Fallback chart data if backend doesn't return it
+  const chartData = stats.chartData ?? [
+    { name: 'Jan', active: 0 },
+    { name: 'Feb', active: 0 },
+    { name: 'Mar', active: 0 },
+    { name: 'Apr', active: 0 },
+    { name: 'May', active: 0 },
+    { name: 'Jun', active: 0 },
+  ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
@@ -154,7 +164,7 @@ const handleClearAll = async () => {
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Documents</Text>
-                <Text style={styles.actionSubtitle}>48 files pending review</Text>
+                <Text style={styles.actionSubtitle}>{stats.totalDocuments} files total</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
