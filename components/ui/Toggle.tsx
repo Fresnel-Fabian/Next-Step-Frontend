@@ -1,5 +1,5 @@
+import { Pressable, StyleSheet, Animated } from 'react-native';
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet } from 'react-native';
 
 interface ToggleProps {
   value: boolean;
@@ -8,58 +8,49 @@ interface ToggleProps {
 }
 
 export const Toggle = ({ value, onValueChange, disabled }: ToggleProps) => {
-  const translateX = useRef(new Animated.Value(value ? 22 : 0)).current;
-  const trackColor = useRef(new Animated.Value(value ? 1 : 0)).current;
+  const translateX = useRef(new Animated.Value(value ? 24 : 0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: value ? 22 : 0,
-        useNativeDriver: true,
-        friction: 6,
-        tension: 80,
-      }),
-      Animated.timing(trackColor, {
-        toValue: value ? 1 : 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
+    Animated.spring(translateX, {
+      toValue: value ? 24 : 0,
+      useNativeDriver: true,
+      friction: 5,
+    }).start();
   }, [value]);
-
-  const bg = trackColor.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#E5E7EB', '#2563EB'],
-  });
 
   return (
     <Pressable
       onPress={() => !disabled && onValueChange(!value)}
       disabled={disabled}
-      style={[styles.hitSlop, disabled && styles.disabled]}
+      style={[
+        styles.track,
+        value ? styles.trackActive : styles.trackInactive,
+        disabled && styles.disabled,
+      ]}
     >
-      <Animated.View style={[styles.track, { backgroundColor: bg }]}>
-        <Animated.View
-          style={[
-            styles.thumb,
-            { transform: [{ translateX }] },
-          ]}
-        />
-      </Animated.View>
+      <Animated.View
+        style={[
+          styles.thumb,
+          { transform: [{ translateX }] },
+        ]}
+      />
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  hitSlop: {
-    padding: 4, // extra tap area without affecting visual size
-  },
   track: {
-    width: 46,
-    height: 26,
-    borderRadius: 13,
-    padding: 3,
+    width: 48,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
     justifyContent: 'center',
+  },
+  trackActive: {
+    backgroundColor: '#2563EB',
+  },
+  trackInactive: {
+    backgroundColor: '#E5E7EB',
   },
   thumb: {
     width: 20,
@@ -67,12 +58,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 3,
   },
   disabled: {
-    opacity: 0.4,
+    opacity: 0.5,
   },
 });

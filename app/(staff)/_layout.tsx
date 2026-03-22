@@ -3,27 +3,19 @@ import { Tabs } from 'expo-router';
 
 export default function StaffLayout() {
   return (
-    <Drawer
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+    <Tabs
       screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: '#2563EB' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
-        drawerActiveTintColor: '#2563EB',
-        drawerInactiveTintColor: '#6B7280',
-        drawerActiveBackgroundColor: '#EFF6FF',
-        drawerStyle: {
+        headerShown: false,
+        tabBarActiveTintColor: '#2563EB',
+        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarStyle: {
           backgroundColor: 'white',
-          width: 260,
-        },
-        drawerLabelStyle: {
-          fontSize: 15,
-          fontWeight: '500',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
         },
       }}
     >
-      <Drawer.Screen
+      <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Home',
@@ -54,16 +46,16 @@ export default function StaffLayout() {
         name="schedules"
         options={{
           title: 'Schedules',
-          drawerIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
         }}
       />
-      <Drawer.Screen
+      <Tabs.Screen
         name="documents"
         options={{
           title: 'Documents',
-          drawerIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }}
@@ -86,69 +78,6 @@ export default function StaffLayout() {
           ),
         }}
       />
-      <Drawer.Screen
-        name="polls"
-        options={{
-          title: 'Polls',
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="bar-chart-outline" size={size} color={color} />
-          ),
-        }}
-      />
-    </Drawer>
+    </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  drawerContainer: {
-    flex: 1,
-  },
-  drawerHeader: {
-    padding: 24,
-    backgroundColor: '#2563EB',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarText: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#2563EB',
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
-  },
-  userRole: {
-    fontSize: 13,
-    color: '#BFDBFE',
-    textTransform: 'capitalize',
-  },
-  navItems: {
-    flex: 1,
-    paddingTop: 8,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  logoutText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#EF4444',
-  },
-});

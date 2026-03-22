@@ -13,14 +13,10 @@ import {
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
-const POLL_OPTIONS = ['Pizza', 'Salad Bar', 'Pasta'];
-
 export default function StaffDashboard() {
   const { user, logout } = useAuthStore();
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPoll, setSelectedPoll] = useState<string | null>(null);
-  const [pollSubmitted, setPollSubmitted] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -63,15 +59,13 @@ export default function StaffDashboard() {
   }
 
   const firstName = user?.name?.split(' ')[0] || 'Staff';
-  const soonCount = schedule.filter((s) => s.isStartingSoon).length;
 
   return (
-    <View style={styles.wrapper}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
-        {/* Page Header */}
-        <View style={styles.pageHeader}>
-          <Text style={styles.greeting}>Good Morning, {firstName} 👋</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Good Morning, {firstName}</Text>
           <Text style={styles.department}>{user?.department || 'Staff Member'}</Text>
         </View>
         <Pressable onPress={handleLogout} style={styles.logoutButton}>
