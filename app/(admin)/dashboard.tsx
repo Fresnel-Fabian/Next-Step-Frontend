@@ -17,9 +17,8 @@ import { BarChart } from 'react-native-chart-kit';
 import Toast from 'react-native-toast-message';
 
 export default function AdminDashboard() {
-  const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [schedule, setSchedule] = useState<StaffScheduleItem[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,11 +29,11 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [scheduleData, activityData] = await Promise.all([
-        DataService.getTodaySchedule(),
+      const [statsData, activityData] = await Promise.all([
+        DataService.getDashboardStats(),
         DataService.getRecentActivity(),
       ]);
-      setSchedule(scheduleData);
+      setStats(statsData);
       setActivities(activityData);
       Toast.show({
         type: 'success',
@@ -110,8 +109,8 @@ const handleClearAll = async () => {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Good Morning, {firstName}</Text>
-          <Text style={styles.department}>{user?.department || 'Administrator'}</Text>
+          <Text style={styles.greeting}>Admin Dashboard</Text>
+          <Text style={styles.subGreeting}>Welcome back, {user?.name || 'Administrator'}</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable onPress={handleRefresh} style={styles.refreshButton}>
@@ -249,9 +248,6 @@ const handleClearAll = async () => {
           )}
         </View>
 
-        <Pressable style={styles.submitButton}>
-          <Text style={styles.submitButtonText}>Submit Vote</Text>
-        </Pressable>
       </View>
     </ScrollView>
   );

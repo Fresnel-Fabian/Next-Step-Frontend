@@ -53,24 +53,6 @@ export default function LoginScreen() {
     responseType: ResponseType.IdToken,
   });
 
-  // ── Base useAuthRequest (NOT Google.useAuthRequest) ───────────────────────
-  // Using the Google provider's hook causes it to auto-exchange the code for
-  // tokens on the client side, which requires a client_secret that cannot
-  // safely be bundled in a mobile app.
-  //
-  // The base hook just obtains the authorization code and code verifier;
-  // our backend performs the actual token exchange.
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId: GoogleAuthConfig.webClientId,
-      scopes: GoogleAuthConfig.scopes,
-      redirectUri,
-      responseType: ResponseType.Code,
-      usePKCE: true,
-    },
-    discovery,
-  );
-
   // Handle Google auth response
   useEffect(() => {
     if (response?.type === "success") {
@@ -267,7 +249,7 @@ export default function LoginScreen() {
               (!request || isLoading) && styles.buttonDisabled,
             ]}
             onPress={handleGoogleLogin}
-            disabled={!request || !discovery || isLoading}
+            disabled={!request || isLoading}
           >
             {isLoading && !email ? (
               <ActivityIndicator color="#2563EB" />
@@ -384,10 +366,6 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontWeight: "600",
   },
-  inputIcon: { marginRight: 8 },
-  input: { flex: 1, paddingVertical: 12, fontSize: 16, color: "#111827" },
-  forgotPassword: { alignSelf: "flex-end", marginBottom: 16 },
-  forgotPasswordText: { fontSize: 14, color: "#2563EB", fontWeight: "600" },
   signInButton: {
     backgroundColor: "#2563EB",
     borderRadius: 12,

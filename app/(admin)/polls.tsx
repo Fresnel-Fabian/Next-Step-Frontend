@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Modal,
     Pressable,
     ScrollView,
@@ -359,17 +360,27 @@ export default function AdminPolls() {
     }
   };
 
-  // ✅ Delete with web-compatible confirmation
-  const handleDeletePoll = async (id: number) => {
-    const confirmed = window.confirm('Are you sure you want to permanently delete this poll? This cannot be undone.');
-    if (!confirmed) return;
-    try {
-      await DataService.deletePoll(id);
-      Toast.show({ type: 'success', text1: 'Poll deleted' });
-      fetchPolls();
-    } catch {
-      Toast.show({ type: 'error', text1: 'Failed to delete poll' });
-    }
+  const handleDeletePoll = (id: number) => {
+    Alert.alert(
+      'Delete Poll',
+      'Are you sure you want to permanently delete this poll? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await DataService.deletePoll(id);
+              Toast.show({ type: 'success', text1: 'Poll deleted' });
+              fetchPolls();
+            } catch {
+              Toast.show({ type: 'error', text1: 'Failed to delete poll' });
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleViewResults = (id: number) => {

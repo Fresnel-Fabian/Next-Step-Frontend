@@ -54,14 +54,6 @@ export interface ScheduleDTO {
   lastUpdated: string;
 }
 
-export interface StaffScheduleItem {
-  id: string;
-  time: string;
-  title: string;
-  location: string;
-  isStartingSoon: boolean;
-}
-
 export interface CreateScheduleData {
   department: string;
   class_count: number;
@@ -322,24 +314,6 @@ static async deleteAllActivity(): Promise<void> {
     }
   }
 
-  /**
-   * Returns today's schedule items for the logged-in staff member,
-   * formatted for the StaffScheduleItem component.
-   */
-  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
-    try {
-      const response = await api.get<StaffScheduleItem[]>(
-        "/api/v1/schedules/today",
-      );
-      return response.data.map((item) => ({
-        ...item,
-        id: String(item.id),
-      }));
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  }
-
   static async getSchedule(id: string): Promise<ScheduleDTO> {
     try {
       const response = await api.get<ScheduleDTO>(`/api/v1/schedules/${id}`);
@@ -444,7 +418,7 @@ static async deleteAllActivity(): Promise<void> {
    * @see https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create
    */
   static async createDocumentFromDrive(
-    data: CreateDriveDocumentData,
+    data: { driveFileId: string; title: string; category: string; description?: string },
   ): Promise<DocumentItem> {
     try {
       const response = await api.post<DocumentItem>(
@@ -478,8 +452,10 @@ static async deleteAllActivity(): Promise<void> {
           : (poll.isActive ? 'No expiry' : 'Ended'),
         creator: 'Administrator',
         voted: false,
-        options: (poll.options || []).map((o: { text: string; votes: number; percentage: number }) => ({
-          label: o.text,
+        options: (poll.options || []).map((o: any) => ({
+          id: o.id,
+          text: o.text || o.label || '',
+          label: o.text || o.label || '',
           votes: o.votes,
           percentage: o.percentage,
         })),
@@ -491,12 +467,7 @@ static async deleteAllActivity(): Promise<void> {
 
   static async deleteDocument(id: string): Promise<void> {
     try {
-      const response = await api.get<Poll>(`/api/v1/polls/${id}`);
-      return {
-        ...response.data,
-        question: response.data.title,
-        status: response.data.isActive ? "active" : "completed",
-      };
+      await api.delete(`/api/v1/documents/${id}`);
     } catch (error) {
       throw handleApiError(error);
     }
