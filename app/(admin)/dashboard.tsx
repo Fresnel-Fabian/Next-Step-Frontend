@@ -16,7 +16,7 @@ import { BarChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,11 +63,8 @@ export default function AdminDashboard() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Admin Dashboard</Text>
-          <Text style={styles.subGreeting}>Welcome back, Administrator</Text>
+          <Text style={styles.subGreeting}>Welcome back, {user?.name || 'Administrator'}</Text>
         </View>
-        <Pressable onPress={logout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#6B7280" />
-        </Pressable>
       </View>
 
       {/* Stats Grid */}
@@ -147,39 +144,40 @@ export default function AdminDashboard() {
               </View>
             </View>
 
-            {/* NEW Chart - react-native-chart-kit */}
-            <View style={styles.chartContainer}>
-              <BarChart
-                data={{
-                  labels: stats.chartData.map(d => d.name),
-                  datasets: [{
-                    data: stats.chartData.map(d => d.active),
-                  }],
-                }}
-                width={Dimensions.get('window').width - 80}
-                height={160}
-                yAxisLabel=""
-                yAxisSuffix=""
-                chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                  style: {
-                    borderRadius: 16,
-                  },
-                  barPercentage: 0.5,
-                }}
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                }}
-                showValuesOnTopOfBars
-                withInnerLines={false}
-              />
-            </View>
+            {/* Chart - with safe guard */}
+            {stats.chartData && stats.chartData.length > 0 ? (
+              <View style={styles.chartContainer}>
+                <BarChart
+                  data={{
+                    labels: stats.chartData.map(d => d.name),
+                    datasets: [{
+                      data: stats.chartData.map(d => d.active),
+                    }],
+                  }}
+                  width={Dimensions.get('window').width - 80}
+                  height={160}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  chartConfig={{
+                    backgroundColor: '#ffffff',
+                    backgroundGradientFrom: '#ffffff',
+                    backgroundGradientTo: '#ffffff',
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    barPercentage: 0.5,
+                  }}
+                  style={{ marginVertical: 8, borderRadius: 16 }}
+                  showValuesOnTopOfBars
+                  withInnerLines={false}
+                />
+              </View>
+            ) : (
+              <View style={styles.chartContainer}>
+                <Text style={{ color: '#9CA3AF', marginTop: 40 }}>No chart data available</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -236,9 +234,6 @@ const styles = StyleSheet.create({
   subGreeting: {
     fontSize: 14,
     color: '#6B7280',
-  },
-  logoutButton: {
-    padding: 8,
   },
   statsGrid: {
     marginBottom: 24,

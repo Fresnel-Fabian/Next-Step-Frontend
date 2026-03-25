@@ -1,6 +1,3 @@
-import { View } from 'react-native';
+import StudentScheduleScreen from '../(shared)/schedules';
 
-// This is a placeholder - actual schedules in (shared)/schedules.tsx
-export default function SchedulesPlaceholder() {
-  return <View />;
-}
+export default StudentScheduleScreen;
