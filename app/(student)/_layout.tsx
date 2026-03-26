@@ -18,19 +18,18 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', icon: 'grid-outline', route: '/(admin)/dashboard' },
-  { label: 'Schedules', icon: 'calendar-outline', route: '/(admin)/schedules' },
-  { label: 'Documents', icon: 'document-text-outline', route: '/(admin)/documents' },
-  { label: 'Announcements', icon: 'megaphone-outline', route: '/(admin)/announcements' },
-  { label: 'Polls', icon: 'bar-chart-outline', route: '/(admin)/polls' },
-  { label: 'Notifications', icon: 'notifications-outline', route: '/(admin)/notification' },
-  { label: 'Settings', icon: 'settings-outline', route: '/(admin)/settings' },
+  { label: 'Home', icon: 'grid-outline', route: '/(student)/dashboard' },
+  { label: 'Polls', icon: 'bar-chart-outline', route: '/(student)/polls' },
+  { label: 'Schedules', icon: 'calendar-outline', route: '/(student)/schedules' },
+  { label: 'Documents', icon: 'document-text-outline', route: '/(student)/documents' },
+  { label: 'Notifications', icon: 'notifications-outline', route: '/(student)/notification' },
+  { label: 'Settings', icon: 'settings-outline', route: '/(student)/settings' },
 ];
 
 const SIDEBAR_WIDTH = 240;
 const SIDEBAR_COLLAPSED = 68;
 
-export default function AdminLayout() {
+export default function StudentLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { logout, user } = useAuthStore();
@@ -42,7 +41,7 @@ export default function AdminLayout() {
   const sidebarWidth = collapsed && !mobileOpen ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
 
   const isActive = (route: string) => {
-    const clean = route.replace('/(admin)', '').replace('/(shared)', '');
+    const clean = route.replace('/(student)', '').replace('/(shared)', '');
     return pathname.includes(clean);
   };
 
@@ -104,15 +103,15 @@ export default function AdminLayout() {
         <View style={styles.userInfo}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'S'}
             </Text>
           </View>
           {(!collapsed || mobileOpen) && (
             <View style={styles.userMeta}>
               <Text style={styles.userName} numberOfLines={1}>
-                {user?.name || 'Administrator'}
+                {user?.name || 'Student'}
               </Text>
-              <Text style={styles.userRole} numberOfLines={1}>Admin</Text>
+              <Text style={styles.userRole} numberOfLines={1}>Student</Text>
             </View>
           )}
         </View>

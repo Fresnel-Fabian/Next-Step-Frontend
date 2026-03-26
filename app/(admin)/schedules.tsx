@@ -11,7 +11,6 @@ import {
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
-// ─── Types ───────────────────────────────────────────────────
 interface ScheduleEvent {
   id: string;
   subject: string;
@@ -27,7 +26,6 @@ interface ScheduleEvent {
 interface LayoutInfo { col: number; totalCols: number; }
 type ViewMode = 'week' | 'day';
 
-// ─── Constants ───────────────────────────────────────────────
 const HOUR_HEIGHT = 72;
 const TIME_COL_WIDTH = 56;
 const START_HOUR = 6;
@@ -44,7 +42,6 @@ const EVENT_COLORS = ['#4285F4', '#EA4335', '#34A853', '#FBBC04', '#8B5CF6', '#E
 const PROFESSORS = ['Dr. Smith', 'Dr. Johnson', 'Prof. Williams', 'Dr. Brown', 'Prof. Davis'];
 const STUDENTS = ['Alice Martin', 'Bob Wilson', 'Carol Taylor', 'David Anderson', 'Emma Thomas', 'Frank Miller', 'Grace Lee'];
 
-// ─── Helpers ─────────────────────────────────────────────────
 const getWeekDates = (date: Date): Date[] => {
   const d = new Date(date);
   const sun = new Date(d);
@@ -76,7 +73,6 @@ const formatTimeDisplay = (time: string) => {
   return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
 };
 
-// ─── Overlap layout ──────────────────────────────────────────
 function computeOverlapLayout(events: ScheduleEvent[]): Map<string, LayoutInfo> {
   const sorted = [...events].sort((a, b) => timeToMin(a.startTime) - timeToMin(b.startTime));
   const layout = new Map<string, LayoutInfo>();
@@ -95,16 +91,16 @@ function computeOverlapLayout(events: ScheduleEvent[]): Map<string, LayoutInfo> 
   for (const group of groups) {
     const columns: ScheduleEvent[][] = [];
     for (const ev of group) {
-      let placedInCol = false;
+      let col = false;
       for (let c = 0; c < columns.length; c++) {
         const last = columns[c][columns[c].length - 1];
         if (timeToMin(ev.startTime) >= timeToMin(last.endTime)) {
           columns[c].push(ev);
           layout.set(ev.id, { col: c, totalCols: 0 });
-          placedInCol = true; break;
+          col = true; break;
         }
       }
-      if (!placedInCol) {
+      if (!col) {
         layout.set(ev.id, { col: columns.length, totalCols: 0 });
         columns.push([ev]);
       }
@@ -114,86 +110,70 @@ function computeOverlapLayout(events: ScheduleEvent[]): Map<string, LayoutInfo> 
   return layout;
 }
 
-// ─── Dropdown ────────────────────────────────────────────────
 function Dropdown({ label, value, options, onSelect, icon }: {
   label: string; value: string; options: string[];
   onSelect: (v: string) => void; icon: keyof typeof Ionicons.glyphMap;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <View style={dds.container}>
-      <View style={dds.labelRow}>
-        <Ionicons name={icon} size={18} color="#5F6368" />
-        <Text style={dds.label}>{label}</Text>
-      </View>
-      <Pressable style={dds.trigger} onPress={() => setOpen(!open)}>
-        <Text style={[dds.value, !value && { color: '#9CA3AF' }]}>{value || `Select ${label.toLowerCase()}`}</Text>
+    <View style={dd.box}>
+      <View style={dd.row}><Ionicons name={icon} size={18} color="#5F6368" /><Text style={dd.lbl}>{label}</Text></View>
+      <Pressable style={dd.trigger} onPress={() => setOpen(!open)}>
+        <Text style={[dd.val, !value && { color: '#9CA3AF' }]}>{value || `Select ${label.toLowerCase()}`}</Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#5F6368" />
       </Pressable>
       {open && (
-        <View style={dds.list}>
-          <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
-            {options.map(opt => (
-              <Pressable key={opt} style={[dds.item, opt === value && dds.itemActive]} onPress={() => { onSelect(opt); setOpen(false); }}>
-                <Text style={[dds.itemText, opt === value && dds.itemTextActive]}>{opt}</Text>
-                {opt === value && <Ionicons name="checkmark" size={16} color="#4285F4" />}
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+        <View style={dd.list}><ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+          {options.map(o => (
+            <Pressable key={o} style={[dd.item, o === value && dd.itemOn]} onPress={() => { onSelect(o); setOpen(false); }}>
+              <Text style={[dd.itemT, o === value && dd.itemTOn]}>{o}</Text>
+              {o === value && <Ionicons name="checkmark" size={16} color="#4285F4" />}
+            </Pressable>
+          ))}
+        </ScrollView></View>
       )}
     </View>
   );
 }
 
-// ─── Multi Dropdown ──────────────────────────────────────────
 function MultiDropdown({ label, values, options, onToggle, icon }: {
   label: string; values: string[]; options: string[];
   onToggle: (v: string) => void; icon: keyof typeof Ionicons.glyphMap;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <View style={dds.container}>
-      <View style={dds.labelRow}>
-        <Ionicons name={icon} size={18} color="#5F6368" />
-        <Text style={dds.label}>{label}</Text>
-      </View>
-      <Pressable style={dds.trigger} onPress={() => setOpen(!open)}>
-        <Text style={[dds.value, values.length === 0 && { color: '#9CA3AF' }]} numberOfLines={1}>
+    <View style={dd.box}>
+      <View style={dd.row}><Ionicons name={icon} size={18} color="#5F6368" /><Text style={dd.lbl}>{label}</Text></View>
+      <Pressable style={dd.trigger} onPress={() => setOpen(!open)}>
+        <Text style={[dd.val, values.length === 0 && { color: '#9CA3AF' }]} numberOfLines={1}>
           {values.length === 0 ? 'Select students' : `${values.length} selected`}
         </Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#5F6368" />
       </Pressable>
       {values.length > 0 && (
-        <View style={mdds.chipRow}>
-          {values.map(v => (
-            <Pressable key={v} style={mdds.chip} onPress={() => onToggle(v)}>
-              <Text style={mdds.chipText}>{v}</Text>
-              <Ionicons name="close-circle" size={14} color="#4285F4" />
-            </Pressable>
-          ))}
-        </View>
+        <View style={md.chips}>{values.map(v => (
+          <Pressable key={v} style={md.chip} onPress={() => onToggle(v)}>
+            <Text style={md.chipT}>{v}</Text><Ionicons name="close-circle" size={14} color="#4285F4" />
+          </Pressable>
+        ))}</View>
       )}
       {open && (
-        <View style={dds.list}>
-          <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
-            {options.map(opt => {
-              const sel = values.includes(opt);
-              return (
-                <Pressable key={opt} style={[dds.item, sel && dds.itemActive]} onPress={() => onToggle(opt)}>
-                  <Text style={[dds.itemText, sel && dds.itemTextActive]}>{opt}</Text>
-                  <View style={[mdds.cb, sel && mdds.cbOn]}>{sel && <Ionicons name="checkmark" size={12} color="#fff" />}</View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+        <View style={dd.list}><ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+          {options.map(o => {
+            const sel = values.includes(o);
+            return (
+              <Pressable key={o} style={[dd.item, sel && dd.itemOn]} onPress={() => onToggle(o)}>
+                <Text style={[dd.itemT, sel && dd.itemTOn]}>{o}</Text>
+                <View style={[md.cb, sel && md.cbOn]}>{sel && <Ionicons name="checkmark" size={12} color="#fff" />}</View>
+              </Pressable>
+            );
+          })}
+        </ScrollView></View>
       )}
     </View>
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────
 export default function SchedulesScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -214,45 +194,30 @@ export default function SchedulesScreen() {
   const [students, setStudents] = useState<string[]>([]);
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
-
-  const availableWidth = containerWidth > 0 ? containerWidth : 600;
-  const dayColW = viewMode === 'week'
-    ? Math.max((availableWidth - TIME_COL_WIDTH) / 7, 40)
-    : availableWidth - TIME_COL_WIDTH;
-
-  const visibleDates = useMemo(
-    () => (viewMode === 'week' ? weekDates : [currentDate]),
-    [viewMode, weekDates, currentDate],
-  );
+  const w = containerWidth > 0 ? containerWidth : 600;
+  const dayColW = viewMode === 'week' ? Math.max((w - TIME_COL_WIDTH) / 7, 40) : w - TIME_COL_WIDTH;
+  const visibleDates = useMemo(() => (viewMode === 'week' ? weekDates : [currentDate]), [viewMode, weekDates, currentDate]);
 
   const goToday = () => setCurrentDate(new Date());
-  const goPrev = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() - (viewMode === 'week' ? 7 : 1));
-    setCurrentDate(d);
-  };
-  const goNext = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + (viewMode === 'week' ? 7 : 1));
-    setCurrentDate(d);
-  };
+  const goPrev = () => { const d = new Date(currentDate); d.setDate(d.getDate() - (viewMode === 'week' ? 7 : 1)); setCurrentDate(d); };
+  const goNext = () => { const d = new Date(currentDate); d.setDate(d.getDate() + (viewMode === 'week' ? 7 : 1)); setCurrentDate(d); };
 
   const headerTitle = useMemo(() => {
     if (viewMode === 'day') return `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getDate()}, ${currentDate.getFullYear()}`;
-    const first = weekDates[0], last = weekDates[6];
-    if (first.getMonth() === last.getMonth()) return `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`;
-    return `${MONTH_NAMES[first.getMonth()].slice(0, 3)} – ${MONTH_NAMES[last.getMonth()].slice(0, 3)} ${last.getFullYear()}`;
+    const f = weekDates[0], l = weekDates[6];
+    if (f.getMonth() === l.getMonth()) return `${MONTH_NAMES[f.getMonth()]} ${f.getFullYear()}`;
+    return `${MONTH_NAMES[f.getMonth()].slice(0, 3)} – ${MONTH_NAMES[l.getMonth()].slice(0, 3)} ${l.getFullYear()}`;
   }, [viewMode, weekDates, currentDate]);
 
   const eventsForDate = useCallback(
-    (dateStr: string) => events.filter(e => e.date === dateStr).sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    (ds: string) => events.filter(e => e.date === ds).sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [events],
   );
 
-  const toggleStudent = (val: string) => setStudents(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
+  const toggleStudent = (v: string) => setStudents(p => p.includes(v) ? p.filter(x => x !== v) : [...p, v]);
 
-  const openCreate = (dateStr: string, hour?: number) => {
-    setEditingEvent(null); setSelectedDate(dateStr); setSubject(''); setDescription('');
+  const openCreate = (ds: string, hour?: number) => {
+    setEditingEvent(null); setSelectedDate(ds); setSubject(''); setDescription('');
     setStartTime(hour != null ? `${String(hour).padStart(2, '0')}:00` : '09:00');
     setEndTime(hour != null ? `${String(hour + 1).padStart(2, '0')}:00` : '10:00');
     setProfessor(''); setStudents([]); setFormError(''); setModalVisible(true);
@@ -270,18 +235,14 @@ export default function SchedulesScreen() {
     if (!isValidTime(endTime)) { setFormError('Invalid end time (use HH:MM)'); return; }
     if (startTime >= endTime) { setFormError('End time must be after start time'); return; }
     setFormError('');
-
     if (editingEvent) {
-      setEvents(prev => prev.map(e =>
-        e.id === editingEvent.id
-          ? { ...e, subject: subject.trim(), description: description.trim(), startTime, endTime, professor, students }
-          : e,
-      ));
+      setEvents(p => p.map(e => e.id === editingEvent.id
+        ? { ...e, subject: subject.trim(), description: description.trim(), startTime, endTime, professor, students } : e));
     } else {
-      setEvents(prev => [...prev, {
+      setEvents(p => [...p, {
         id: Date.now().toString(), subject: subject.trim(), description: description.trim(),
         date: selectedDate, startTime, endTime, professor, students,
-        color: EVENT_COLORS[prev.length % EVENT_COLORS.length],
+        color: EVENT_COLORS[p.length % EVENT_COLORS.length],
       }]);
     }
     setModalVisible(false);
@@ -289,177 +250,129 @@ export default function SchedulesScreen() {
 
   const handleDelete = (id: string) => setEvents(p => p.filter(e => e.id !== id));
 
-  const handleLayout = useCallback((e: any) => {
-    const w = e.nativeEvent.layout.width;
-    if (w > 0 && w !== containerWidth) setContainerWidth(w);
-  }, [containerWidth]);
-
-  const initialScrollDone = useRef(false);
-  const handleScrollLayout = useCallback(() => {
-    if (!initialScrollDone.current) {
-      initialScrollDone.current = true;
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({ y: (9 - START_HOUR) * HOUR_HEIGHT, animated: false });
-      }, 200);
+  const scrollDone = useRef(false);
+  const onGridLayout = useCallback(() => {
+    if (!scrollDone.current) {
+      scrollDone.current = true;
+      setTimeout(() => scrollRef.current?.scrollTo({ y: (9 - START_HOUR) * HOUR_HEIGHT, animated: false }), 200);
     }
   }, []);
 
+  if (containerWidth === 0) {
+    return <View style={s.container} onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}><Text style={{ padding: 20, color: '#9CA3AF' }}>Loading...</Text></View>;
+  }
+
   return (
-    <View style={st.container} onLayout={handleLayout}>
+    <View style={s.container} onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}>
       {/* Top Bar */}
-      <View style={st.topBar}>
-        <View style={st.topLeft}>
-          <Pressable style={st.todayBtn} onPress={goToday}><Text style={st.todayBtnText}>Today</Text></Pressable>
-          <View style={st.navArrows}>
+      <View style={s.topBar}>
+        <View style={s.topLeft}>
+          <Pressable style={s.todayBtn} onPress={goToday}><Text style={s.todayBtnT}>Today</Text></Pressable>
+          <View style={s.arrows}>
             <Pressable onPress={goPrev} hitSlop={8}><Ionicons name="chevron-back" size={22} color="#5F6368" /></Pressable>
             <Pressable onPress={goNext} hitSlop={8}><Ionicons name="chevron-forward" size={22} color="#5F6368" /></Pressable>
           </View>
-          <Text style={st.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+          <Text style={s.title} numberOfLines={1}>{headerTitle}</Text>
         </View>
-        <View style={st.topRight}>
-          <View style={st.viewToggle}>
-            <Pressable style={[st.toggleBtn, viewMode === 'week' && st.toggleBtnOn]} onPress={() => setViewMode('week')}>
-              <Text style={[st.toggleText, viewMode === 'week' && st.toggleTextOn]}>Week</Text>
+        <View style={s.topRight}>
+          <View style={s.toggle}>
+            <Pressable style={[s.togBtn, viewMode === 'week' && s.togOn]} onPress={() => setViewMode('week')}>
+              <Text style={[s.togT, viewMode === 'week' && s.togTOn]}>Week</Text>
             </Pressable>
-            <Pressable style={[st.toggleBtn, viewMode === 'day' && st.toggleBtnOn]} onPress={() => setViewMode('day')}>
-              <Text style={[st.toggleText, viewMode === 'day' && st.toggleTextOn]}>Day</Text>
+            <Pressable style={[s.togBtn, viewMode === 'day' && s.togOn]} onPress={() => setViewMode('day')}>
+              <Text style={[s.togT, viewMode === 'day' && s.togTOn]}>Day</Text>
             </Pressable>
           </View>
-          <Pressable style={st.addBtn} onPress={() => openCreate(fmt(currentDate))}>
+          <Pressable style={s.addBtn} onPress={() => openCreate(fmt(currentDate))}>
             <Ionicons name="add" size={20} color="#fff" />
           </Pressable>
         </View>
       </View>
 
       {/* Day Header */}
-      <View style={st.dayHeaderRow}>
+      <View style={s.dayHdr}>
         <View style={{ width: TIME_COL_WIDTH }} />
         {visibleDates.map(d => {
-          const today = isToday(d);
+          const t = isToday(d);
           return (
-            <Pressable key={fmt(d)} style={[st.dayHeaderCell, { width: dayColW }]} onPress={() => { setCurrentDate(d); setViewMode('day'); }}>
-              <Text style={[st.dayName, today && st.dayNameToday]}>
-                {viewMode === 'day' ? DAY_NAMES_FULL[d.getDay()].toUpperCase() : DAY_NAMES[d.getDay()]}
-              </Text>
-              <View style={[st.dayNum, today && st.dayNumToday]}>
-                <Text style={[st.dayNumText, today && st.dayNumTextToday]}>{d.getDate()}</Text>
-              </View>
+            <Pressable key={fmt(d)} style={[s.dayCell, { width: dayColW }]} onPress={() => { setCurrentDate(d); setViewMode('day'); }}>
+              <Text style={[s.dayNm, t && s.dayNmT]}>{viewMode === 'day' ? DAY_NAMES_FULL[d.getDay()].toUpperCase() : DAY_NAMES[d.getDay()]}</Text>
+              <View style={[s.dayNo, t && s.dayNoT]}><Text style={[s.dayNoTx, t && s.dayNoTxT]}>{d.getDate()}</Text></View>
             </Pressable>
           );
         })}
       </View>
 
-      {/* Scrollable Time Grid */}
-      {containerWidth > 0 && (
-        <ScrollView
-          ref={scrollRef}
-          style={{ flex: 1 }}
-          onLayout={handleScrollLayout}
-          showsVerticalScrollIndicator
-          scrollEventThrottle={16}
-        >
-          {/* Fixed-height wrapper — this is what makes scroll work */}
-          <View style={{ height: GRID_HEIGHT, flexDirection: 'row' }}>
-
-            {/* Time labels column */}
-            <View style={{ width: TIME_COL_WIDTH }}>
-              {HOURS.map(h => (
-                <View key={h} style={{ height: HOUR_HEIGHT, justifyContent: 'flex-start', alignItems: 'flex-end', paddingRight: 8 }}>
-                  <Text style={st.timeLabel}>{formatHour(h)}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Day columns */}
-            {visibleDates.map(d => {
-              const dateStr = fmt(d);
-              const today = isToday(d);
-              const dayEvents = eventsForDate(dateStr);
-              const layoutMap = computeOverlapLayout(dayEvents);
-
-              return (
-                <View
-                  key={dateStr}
-                  style={{
-                    width: dayColW,
-                    height: GRID_HEIGHT,
-                    borderLeftWidth: 0.5,
-                    borderLeftColor: '#E5E7EB',
-                    backgroundColor: today ? '#EFF6FF' : 'transparent',
-                    position: 'relative',
-                  }}
-                >
-                  {/* Hour cells (tap targets + grid lines) */}
-                  {HOURS.map(h => (
-                    <Pressable
-                      key={h}
-                      style={{ height: HOUR_HEIGHT, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }}
-                      onPress={() => openCreate(dateStr, h)}
-                    />
-                  ))}
-
-                  {/* Event blocks */}
-                  {dayEvents.map(ev => {
-                    const topMin = timeToMin(ev.startTime) - START_HOUR * 60;
-                    const dur = timeToMin(ev.endTime) - timeToMin(ev.startTime);
-                    const top = (topMin / 60) * HOUR_HEIGHT;
-                    const h = (dur / 60) * HOUR_HEIGHT;
-                    const info = layoutMap.get(ev.id) || { col: 0, totalCols: 1 };
-                    const colW = (dayColW - 6) / info.totalCols;
-                    const left = 3 + info.col * colW;
-
-                    return (
-                      <Pressable
-                        key={ev.id}
-                        style={{
-                          position: 'absolute',
-                          top,
-                          left,
-                          width: colW - 3,
-                          height: Math.max(h, 28),
-                          backgroundColor: ev.color,
-                          borderRadius: 6,
-                          borderLeftWidth: 4,
-                          borderLeftColor: 'rgba(0,0,0,0.2)',
-                          paddingHorizontal: 8,
-                          paddingVertical: 5,
-                          overflow: 'hidden',
-                        }}
-                        onPress={() => openEdit(ev)}
-                        onLongPress={() => setDeleteConfirm(ev.id)}
-                      >
-                        <Text style={st.evTitle} numberOfLines={1}>{ev.subject}</Text>
-                        {h > 34 && <Text style={st.evTime} numberOfLines={1}>{formatTimeDisplay(ev.startTime)} – {formatTimeDisplay(ev.endTime)}</Text>}
-                        {h > 56 && ev.professor ? <Text style={st.evSub} numberOfLines={1}>{ev.professor}</Text> : null}
-                        {h > 76 && ev.students.length > 0 ? <Text style={st.evSub} numberOfLines={1}>{ev.students.length} student{ev.students.length > 1 ? 's' : ''}</Text> : null}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              );
-            })}
+      {/* Scrollable Grid */}
+      <ScrollView ref={scrollRef} style={{ flex: 1 }} onLayout={onGridLayout} showsVerticalScrollIndicator>
+        <View style={{ height: GRID_HEIGHT, flexDirection: 'row' }}>
+          {/* Time labels */}
+          <View style={{ width: TIME_COL_WIDTH, height: GRID_HEIGHT }}>
+            {HOURS.map(h => (
+              <View key={h} style={{ height: HOUR_HEIGHT, justifyContent: 'flex-start', alignItems: 'flex-end', paddingRight: 8 }}>
+                <Text style={{ fontSize: 10, color: '#70757A', marginTop: -7 }}>{formatHour(h)}</Text>
+              </View>
+            ))}
           </View>
-        </ScrollView>
-      )}
+
+          {/* Day columns */}
+          {visibleDates.map(d => {
+            const ds = fmt(d);
+            const today = isToday(d);
+            const de = eventsForDate(ds);
+            const lm = computeOverlapLayout(de);
+
+            return (
+              <View key={ds} style={{ width: dayColW, height: GRID_HEIGHT, borderLeftWidth: 0.5, borderLeftColor: '#E5E7EB', backgroundColor: today ? '#EFF6FF' : 'transparent', position: 'relative' as const }}>
+                {HOURS.map(h => (
+                  <Pressable key={h} style={{ height: HOUR_HEIGHT, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }} onPress={() => openCreate(ds, h)} />
+                ))}
+                {de.map(ev => {
+                  const topMin = timeToMin(ev.startTime) - START_HOUR * 60;
+                  const dur = timeToMin(ev.endTime) - timeToMin(ev.startTime);
+                  const top = (topMin / 60) * HOUR_HEIGHT;
+                  const h = (dur / 60) * HOUR_HEIGHT;
+                  const info = lm.get(ev.id) || { col: 0, totalCols: 1 };
+                  const cw = (dayColW - 6) / info.totalCols;
+                  const left = 3 + info.col * cw;
+
+                  return (
+                    <Pressable
+                      key={ev.id}
+                      onPress={() => openEdit(ev)}
+                      onLongPress={() => setDeleteConfirm(ev.id)}
+                      style={{
+                        position: 'absolute' as const, top, left, width: cw - 3,
+                        height: Math.max(h, 30), backgroundColor: ev.color,
+                        borderRadius: 6, borderLeftWidth: 4, borderLeftColor: 'rgba(0,0,0,0.2)',
+                        paddingHorizontal: 8, paddingVertical: 6, overflow: 'hidden' as const,
+                      }}
+                    >
+                      <Text style={s.evT} numberOfLines={1}>{ev.subject}</Text>
+                      {h > 36 && <Text style={s.evTm} numberOfLines={1}>{formatTimeDisplay(ev.startTime)} – {formatTimeDisplay(ev.endTime)}</Text>}
+                      {h > 58 && ev.professor ? <Text style={s.evS} numberOfLines={1}>{ev.professor}</Text> : null}
+                      {h > 78 && ev.students.length > 0 ? <Text style={s.evS} numberOfLines={1}>{ev.students.length} student{ev.students.length > 1 ? 's' : ''}</Text> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
 
       {/* FAB */}
-      <Pressable style={st.fab} onPress={() => openCreate(fmt(currentDate))}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
+      <Pressable style={s.fab} onPress={() => openCreate(fmt(currentDate))}><Ionicons name="add" size={28} color="#fff" /></Pressable>
 
       {/* Delete Confirm */}
       <Modal visible={deleteConfirm !== null} transparent animationType="fade" onRequestClose={() => setDeleteConfirm(null)}>
-        <Pressable style={st.overlay} onPress={() => setDeleteConfirm(null)}>
-          <View style={st.confirmBox}>
-            <Text style={st.confirmTitle}>Delete Event</Text>
-            <Text style={st.confirmText}>Are you sure you want to delete this event?</Text>
-            <View style={st.confirmActions}>
-              <Pressable style={st.confirmCancel} onPress={() => setDeleteConfirm(null)}>
-                <Text style={st.confirmCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={st.confirmDelete} onPress={() => { if (deleteConfirm) handleDelete(deleteConfirm); setDeleteConfirm(null); }}>
-                <Text style={st.confirmDeleteText}>Delete</Text>
-              </Pressable>
+        <Pressable style={s.ov} onPress={() => setDeleteConfirm(null)}>
+          <View style={s.cBox}>
+            <Text style={s.cTitle}>Delete Event</Text>
+            <Text style={s.cText}>Are you sure you want to delete this event?</Text>
+            <View style={s.cActions}>
+              <Pressable style={s.cCancel} onPress={() => setDeleteConfirm(null)}><Text style={s.cCancelT}>Cancel</Text></Pressable>
+              <Pressable style={s.cDel} onPress={() => { if (deleteConfirm) handleDelete(deleteConfirm); setDeleteConfirm(null); }}><Text style={s.cDelT}>Delete</Text></Pressable>
             </View>
           </View>
         </Pressable>
@@ -467,50 +380,28 @@ export default function SchedulesScreen() {
 
       {/* Create / Edit Modal */}
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <Pressable style={st.overlay} onPress={() => setModalVisible(false)}>
-          <Pressable style={st.modalBox} onPress={e => e.stopPropagation()}>
-            <View style={st.modalHeader}>
-              <Pressable onPress={() => setModalVisible(false)} hitSlop={8}>
-                <Ionicons name="close" size={22} color="#5F6368" />
-              </Pressable>
-              <Text style={st.modalTitle}>{editingEvent ? 'Edit Event' : 'New Event'}</Text>
-              <Pressable style={st.saveBtn} onPress={handleSave}>
-                <Text style={st.saveBtnText}>Save</Text>
-              </Pressable>
+        <Pressable style={s.ov} onPress={() => setModalVisible(false)}>
+          <Pressable style={s.mBox} onPress={e => e.stopPropagation()}>
+            <View style={s.mHdr}>
+              <Pressable onPress={() => setModalVisible(false)} hitSlop={8}><Ionicons name="close" size={22} color="#5F6368" /></Pressable>
+              <Text style={s.mTitle}>{editingEvent ? 'Edit Event' : 'New Event'}</Text>
+              <Pressable style={s.saveBtn} onPress={handleSave}><Text style={s.saveBtnT}>Save</Text></Pressable>
             </View>
-
-            {formError ? (
-              <View style={st.errorBar}>
-                <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                <Text style={st.errorText}>{formError}</Text>
-              </View>
-            ) : null}
-
-            <ScrollView style={st.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View style={st.fieldRow}>
-                <Ionicons name="book-outline" size={18} color="#5F6368" />
-                <TextInput style={st.subjectInput} placeholder="Add subject" placeholderTextColor="#9CA3AF" value={subject} onChangeText={t => { setSubject(t); setFormError(''); }} autoFocus />
-              </View>
-              <View style={st.fieldRow}>
-                <Ionicons name="calendar-outline" size={18} color="#5F6368" />
-                <Text style={st.fieldText}>
-                  {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                </Text>
-              </View>
-              <View style={st.fieldRow}>
+            {formError ? <View style={s.err}><Ionicons name="alert-circle" size={16} color="#DC2626" /><Text style={s.errT}>{formError}</Text></View> : null}
+            <ScrollView style={s.mBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={s.fRow}><Ionicons name="book-outline" size={18} color="#5F6368" /><TextInput style={s.subIn} placeholder="Add subject" placeholderTextColor="#9CA3AF" value={subject} onChangeText={t => { setSubject(t); setFormError(''); }} autoFocus /></View>
+              <View style={s.fRow}><Ionicons name="calendar-outline" size={18} color="#5F6368" /><Text style={s.fText}>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</Text></View>
+              <View style={s.fRow}>
                 <Ionicons name="time-outline" size={18} color="#5F6368" />
-                <View style={st.timeInputRow}>
-                  <TextInput style={st.timeField} value={startTime} onChangeText={t => { setStartTime(t); setFormError(''); }} placeholder="09:00" placeholderTextColor="#9CA3AF" keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'} />
-                  <Text style={st.timeDash}>–</Text>
-                  <TextInput style={st.timeField} value={endTime} onChangeText={t => { setEndTime(t); setFormError(''); }} placeholder="10:00" placeholderTextColor="#9CA3AF" keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'} />
+                <View style={s.tmRow}>
+                  <TextInput style={s.tmIn} value={startTime} onChangeText={t => { setStartTime(t); setFormError(''); }} placeholder="09:00" placeholderTextColor="#9CA3AF" keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'} />
+                  <Text style={s.tmDash}>–</Text>
+                  <TextInput style={s.tmIn} value={endTime} onChangeText={t => { setEndTime(t); setFormError(''); }} placeholder="10:00" placeholderTextColor="#9CA3AF" keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'} />
                 </View>
               </View>
               <Dropdown label="Professor" value={professor} options={PROFESSORS} onSelect={setProfessor} icon="person-outline" />
               <MultiDropdown label="Students" values={students} options={STUDENTS} onToggle={toggleStudent} icon="school-outline" />
-              <View style={[st.fieldRow, { alignItems: 'flex-start' }]}>
-                <Ionicons name="document-text-outline" size={18} color="#5F6368" style={{ marginTop: 2 }} />
-                <TextInput style={st.descInput} placeholder="Description (optional)" placeholderTextColor="#9CA3AF" value={description} onChangeText={setDescription} multiline />
-              </View>
+              <View style={[s.fRow, { alignItems: 'flex-start' }]}><Ionicons name="document-text-outline" size={18} color="#5F6368" style={{ marginTop: 2 }} /><TextInput style={s.descIn} placeholder="Description (optional)" placeholderTextColor="#9CA3AF" value={description} onChangeText={setDescription} multiline /></View>
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -519,88 +410,78 @@ export default function SchedulesScreen() {
   );
 }
 
-// ─── Dropdown styles ─────────────────────────────────────────
-const dds = StyleSheet.create({
-  container: { paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
-  label: { fontSize: 12, fontWeight: '600', color: '#5F6368', textTransform: 'uppercase', letterSpacing: 0.5 },
+const dd = StyleSheet.create({
+  box: { paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  lbl: { fontSize: 12, fontWeight: '600', color: '#5F6368', textTransform: 'uppercase', letterSpacing: 0.5 },
   trigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, marginLeft: 28 },
-  value: { fontSize: 14, color: '#3C4043' },
-  list: { marginLeft: 28, marginTop: 4, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+  val: { fontSize: 14, color: '#3C4043' },
+  list: { marginLeft: 28, marginTop: 4, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden' },
   item: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6' },
-  itemActive: { backgroundColor: '#EFF6FF' },
-  itemText: { fontSize: 14, color: '#3C4043' },
-  itemTextActive: { color: '#4285F4', fontWeight: '600' },
+  itemOn: { backgroundColor: '#EFF6FF' },
+  itemT: { fontSize: 14, color: '#3C4043' },
+  itemTOn: { color: '#4285F4', fontWeight: '600' },
 });
 
-const mdds = StyleSheet.create({
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 28, marginTop: 8 },
+const md = StyleSheet.create({
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 28, marginTop: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  chipText: { fontSize: 12, color: '#4285F4', fontWeight: '500' },
+  chipT: { fontSize: 12, color: '#4285F4', fontWeight: '500' },
   cb: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center' },
   cbOn: { backgroundColor: '#4285F4', borderColor: '#4285F4' },
 });
 
-// ─── Main styles ─────────────────────────────────────────────
-const st = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
   topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 },
   todayBtn: { borderWidth: 1, borderColor: '#DADCE0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 5 },
-  todayBtnText: { fontSize: 13, fontWeight: '600', color: '#3C4043' },
-  navArrows: { flexDirection: 'row', gap: 4, alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '600', color: '#3C4043', marginLeft: 4, flexShrink: 1 },
-
-  viewToggle: { flexDirection: 'row', borderWidth: 1, borderColor: '#DADCE0', borderRadius: 8, overflow: 'hidden' },
-  toggleBtn: { paddingHorizontal: 14, paddingVertical: 6, backgroundColor: '#fff' },
-  toggleBtnOn: { backgroundColor: '#4285F4' },
-  toggleText: { fontSize: 13, fontWeight: '600', color: '#5F6368' },
-  toggleTextOn: { color: '#fff' },
+  todayBtnT: { fontSize: 13, fontWeight: '600', color: '#3C4043' },
+  arrows: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+  title: { fontSize: 18, fontWeight: '600', color: '#3C4043', marginLeft: 4, flexShrink: 1 },
+  toggle: { flexDirection: 'row', borderWidth: 1, borderColor: '#DADCE0', borderRadius: 8, overflow: 'hidden' },
+  togBtn: { paddingHorizontal: 14, paddingVertical: 6, backgroundColor: '#fff' },
+  togOn: { backgroundColor: '#4285F4' },
+  togT: { fontSize: 13, fontWeight: '600', color: '#5F6368' },
+  togTOn: { color: '#fff' },
   addBtn: { backgroundColor: '#4285F4', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  dayHdr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingBottom: 6, paddingTop: 8 },
+  dayCell: { alignItems: 'center' },
+  dayNm: { fontSize: 11, fontWeight: '600', color: '#70757A', letterSpacing: 0.5 },
+  dayNmT: { color: '#4285F4' },
+  dayNo: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  dayNoT: { backgroundColor: '#4285F4' },
+  dayNoTx: { fontSize: 18, fontWeight: '500', color: '#3C4043' },
+  dayNoTxT: { color: '#fff', fontWeight: '600' },
 
-  dayHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingBottom: 6, paddingTop: 8 },
-  dayHeaderCell: { alignItems: 'center' },
-  dayName: { fontSize: 11, fontWeight: '600', color: '#70757A', letterSpacing: 0.5 },
-  dayNameToday: { color: '#4285F4' },
-  dayNum: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
-  dayNumToday: { backgroundColor: '#4285F4' },
-  dayNumText: { fontSize: 18, fontWeight: '500', color: '#3C4043' },
-  dayNumTextToday: { color: '#fff', fontWeight: '600' },
-
-  timeLabel: { fontSize: 10, color: '#70757A', marginTop: -7 },
-
-  evTitle: { fontSize: 12, fontWeight: '700', color: '#fff' },
-  evTime: { fontSize: 10, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
-  evSub: { fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  evT: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  evTm: { fontSize: 11, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
+  evS: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
 
   fab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: '#4285F4', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
-
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: '#fff', borderRadius: 16, width: '90%', maxWidth: 520, maxHeight: '75%', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10, overflow: 'hidden' },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  modalTitle: { fontSize: 16, fontWeight: '600', color: '#3C4043' },
+  ov: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  mBox: { backgroundColor: '#fff', borderRadius: 16, width: '90%', maxWidth: 420, maxHeight: '75%', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10, overflow: 'hidden' },
+  mHdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  mTitle: { fontSize: 16, fontWeight: '600', color: '#3C4043' },
   saveBtn: { backgroundColor: '#4285F4', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 },
-  saveBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  modalBody: { padding: 16 },
-  errorBar: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', paddingHorizontal: 16, paddingVertical: 8 },
-  errorText: { fontSize: 13, color: '#DC2626', fontWeight: '500' },
-
-  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' },
-  subjectInput: { flex: 1, fontSize: 16, fontWeight: '500', color: '#3C4043' },
-  fieldText: { fontSize: 14, color: '#3C4043' },
-  timeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeField: { fontSize: 14, color: '#3C4043', backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, minWidth: 70, textAlign: 'center' },
-  timeDash: { fontSize: 14, color: '#70757A' },
-  descInput: { flex: 1, fontSize: 14, color: '#3C4043', minHeight: 50, textAlignVertical: 'top' },
-
-  confirmBox: { backgroundColor: '#fff', borderRadius: 14, padding: 24, width: '80%', maxWidth: 340, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
-  confirmTitle: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  confirmText: { fontSize: 14, color: '#6B7280', marginBottom: 20 },
-  confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
-  confirmCancel: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 },
-  confirmCancelText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
-  confirmDelete: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, backgroundColor: '#DC2626' },
-  confirmDeleteText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  saveBtnT: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  mBody: { padding: 16 },
+  err: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', paddingHorizontal: 16, paddingVertical: 8 },
+  errT: { fontSize: 13, color: '#DC2626', fontWeight: '500' },
+  fRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' },
+  subIn: { flex: 1, fontSize: 16, fontWeight: '500', color: '#3C4043' },
+  fText: { fontSize: 14, color: '#3C4043' },
+  tmRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tmIn: { fontSize: 14, color: '#3C4043', backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, minWidth: 70, textAlign: 'center' },
+  tmDash: { fontSize: 14, color: '#70757A' },
+  descIn: { flex: 1, fontSize: 14, color: '#3C4043', minHeight: 50, textAlignVertical: 'top' },
+  cBox: { backgroundColor: '#fff', borderRadius: 14, padding: 24, width: '80%', maxWidth: 340 },
+  cTitle: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 8 },
+  cText: { fontSize: 14, color: '#6B7280', marginBottom: 20 },
+  cActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
+  cCancel: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 },
+  cCancelT: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  cDel: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, backgroundColor: '#DC2626' },
+  cDelT: { fontSize: 14, fontWeight: '600', color: '#fff' },
 });

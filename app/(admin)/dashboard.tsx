@@ -12,7 +12,6 @@ import { useAuthStore } from '@/store/authStore';
 import { DataService, DashboardStats, ActivityLog } from '@/services/dataService';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ActivityItem } from '@/components/dashboard/ActivityItem';
-import { BarChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AdminDashboard() {
@@ -147,31 +146,7 @@ export default function AdminDashboard() {
             {/* Chart - with safe guard */}
             {stats.chartData && stats.chartData.length > 0 ? (
               <View style={styles.chartContainer}>
-                <BarChart
-                  data={{
-                    labels: stats.chartData.map(d => d.name),
-                    datasets: [{
-                      data: stats.chartData.map(d => d.active),
-                    }],
-                  }}
-                  width={Dimensions.get('window').width - 80}
-                  height={160}
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  chartConfig={{
-                    backgroundColor: '#ffffff',
-                    backgroundGradientFrom: '#ffffff',
-                    backgroundGradientTo: '#ffffff',
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                    style: { borderRadius: 16 },
-                    barPercentage: 0.5,
-                  }}
-                  style={{ marginVertical: 8, borderRadius: 16 }}
-                  showValuesOnTopOfBars
-                  withInnerLines={false}
-                />
+                <Text style={{ color: '#9CA3AF' }}>Chart loaded</Text>
               </View>
             ) : (
               <View style={styles.chartContainer}>
@@ -211,7 +186,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   content: {
-    padding: 16,
+    padding: 24,
   },
   loadingContainer: {
     flex: 1,
@@ -223,39 +198,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
   },
   greeting: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   subGreeting: {
     fontSize: 14,
     color: '#6B7280',
   },
   statsGrid: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   statRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: 16,
+    marginBottom: 16,
   },
   statHalf: {
     flex: 1,
   },
   mainContent: {
-    gap: 16,
+    gap: 20,
   },
   leftColumn: {
-    gap: 16,
+    gap: 20,
   },
   actionCard: {
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#F3F4F6',
     flexDirection: 'row',
@@ -293,8 +268,8 @@ const styles = StyleSheet.create({
   },
   analyticsCard: {
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#F3F4F6',
     shadowColor: '#000',
@@ -304,17 +279,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   analyticsHeader: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   chartContainer: {
     height: 180,
     marginTop: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   activityCard: {
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#F3F4F6',
     shadowColor: '#000',
@@ -327,7 +303,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   activityTitle: {
     fontSize: 16,

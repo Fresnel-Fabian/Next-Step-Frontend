@@ -2,20 +2,22 @@ import { Toggle } from '@/components/ui/Toggle';
 import { useAuthStore } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export default function SettingsScreen() {
+  const router = useRouter(); //  ADD THIS
   const { user, logout } = useAuthStore();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
@@ -56,21 +58,47 @@ export default function SettingsScreen() {
     setIsEditModalVisible(true);
   };
 
+  //  UPDATED: Save profile with toast
   const handleSaveProfile = () => {
     if (!formData.name.trim()) {
-      Alert.alert('Error', 'Name cannot be empty');
+      //  NEW: Validation error toast
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Name cannot be empty',
+        position: 'top',
+        visibilityTime: 2000,
+      });
       return;
     }
+    
     // TODO: Update user in store
     console.log('Saving profile:', formData);
     setIsEditModalVisible(false);
+    
+    //  NEW: Success toast
+    Toast.show({
+      type: 'success',
+      text1: 'Profile Updated',
+      text2: 'Your changes have been saved',
+      position: 'top',
+      visibilityTime: 2000,
+    });
   };
 
+  //  UPDATED: Pick image with toast
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow access to your photos');
+      //  NEW: Permission denied toast
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'Please allow access to your photos',
+        position: 'top',
+        visibilityTime: 2000,
+      });
       return;
     }
 
@@ -83,17 +111,80 @@ export default function SettingsScreen() {
 
     if (!result.canceled) {
       setFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+      
+      //  NEW: Image selected toast
+      Toast.show({
+        type: 'success',
+        text1: 'Photo Selected',
+        text2: 'Your new profile photo is ready',
+        position: 'top',
+        visibilityTime: 2000,
+      });
     }
   };
 
+  //  UPDATED: Toggle notification with toast
   const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+    const newValue = !notifications[key];
+    setNotifications(prev => ({ ...prev, [key]: newValue }));
+    
+    //  NEW: Toggle toast
+    const labels = {
+      push: 'Push Notifications',
+      email: 'Email Notifications',
+      schedule: 'Schedule Alerts',
+    };
+    
+    Toast.show({
+      type: 'success',
+      text1: labels[key],
+      text2: newValue ? 'Enabled' : 'Disabled',
+      position: 'top',
+      visibilityTime: 1500,
+    });
   };
 
+  //  UPDATED: Language select with toast
   const handleLanguageSelect = (langName: string) => {
     setCurrentLanguage(langName);
     setIsLanguageModalVisible(false);
-    Alert.alert('Language Changed', `Language set to ${langName}`);
+    
+    //  NEW: Language changed toast
+    Toast.show({
+      type: 'success',
+      text1: 'Language Changed',
+      text2: `Language set to ${langName}`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
+  };
+  // UPDATED: Dark mode toggle with toast
+  const handleDarkModeToggle = (value: boolean) => {
+    setIsDarkMode(value);
+    
+    // NEW: Dark mode toast
+    Toast.show({
+      type: 'success',
+      text1: value ? 'Dark Mode Enabled' : 'Light Mode Enabled',
+      text2: value ? 'Easy on the eyes!' : 'Bright and clear!',
+      position: 'top',
+      visibilityTime: 1500,
+    });
+  };
+
+  //  UPDATED: Logout with toast
+  const handleLogout = () => {
+    Toast.show({
+      type: 'info',
+      text1: 'Logging Out',
+      text2: 'See you soon!',
+      position: 'top',
+      visibilityTime: 2000,
+    });
+    
+    setTimeout(() => {
+      logout();
+    }, 500);
   };
 
   const getInitials = () => {
@@ -103,10 +194,15 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Header */}
+        {/* Header - UPDATED */}
         <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Manage your account and preferences</Text>
+          {/*  ADD BACK BUTTON */}
+          <View style={styles.headerTop}>
+            <View style={styles.headerContent}>
+              <Text style={styles.title}>Settings</Text>
+              <Text style={styles.subtitle}>Manage your account and preferences</Text>
+            </View>
+          </View>
         </View>
 
         {/* Profile Card */}
@@ -149,13 +245,31 @@ export default function SettingsScreen() {
                 icon: 'lock-closed-outline',
                 label: 'Change Password',
                 sub: 'Update your security credentials',
-                onPress: () => Alert.alert('Coming Soon', 'Password change feature'),
+                onPress: () => {
+                  //  NEW: Password change toast
+                  Toast.show({
+                    type: 'info',
+                    text1: 'Change Password',
+                    text2: 'This feature is coming soon',
+                    position: 'top',
+                    visibilityTime: 2000,
+                  });
+                },
               },
               {
                 icon: 'phone-portrait-outline',
                 label: 'Connected Devices',
                 sub: 'Manage logged-in devices',
-                onPress: () => Alert.alert('Coming Soon', 'Device management feature'),
+                onPress: () => {
+                  //  NEW: Devices toast
+                  Toast.show({
+                    type: 'info',
+                    text1: 'Connected Devices',
+                    text2: 'Device management coming soon',
+                    position: 'top',
+                    visibilityTime: 2000,
+                  });
+                },
               },
             ].map((item, idx) => (
               <Pressable
@@ -413,6 +527,18 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
+  },
+  //  ADD THESE NEW STYLES
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerContent: {
+    flex: 1,
   },
   title: {
     fontSize: 24,

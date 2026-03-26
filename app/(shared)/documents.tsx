@@ -1,7 +1,7 @@
 import { DocumentListItem } from '@/components/documents/DocumentListItem';
-import { DataService } from '@/services/dataService';
-import { DocumentItem } from '@/types/document';
+import { DataService, DocumentItem } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -13,9 +13,11 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(0);
@@ -32,8 +34,22 @@ export default function DocumentsScreen() {
       setLoading(true);
       const data = await DataService.getDocuments();
       setDocuments(data);
+      Toast.show({
+        type: 'success',
+        text1: 'Documents Loaded',
+        text2: `${data.length} documents available`,
+        position: 'top',
+        visibilityTime: 2000,
+      });
     } catch (error) {
       console.error('Failed to fetch documents:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Load Documents',
+        text2: 'Please check your connection',
+        position: 'top',
+        visibilityTime: 3000,
+      });
     } finally {
       setLoading(false);
     }
@@ -45,7 +61,23 @@ export default function DocumentsScreen() {
 
   const handleDownload = (doc: DocumentItem) => {
     console.log('Download:', doc.title);
-    // TODO: Implement download
+    Toast.show({
+      type: 'success',
+      text1: 'Download Started',
+      text2: `Downloading ${doc.title}`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
+  };
+
+  const handleShare = (doc: DocumentItem) => {
+    Toast.show({
+      type: 'success',
+      text1: 'Ready to Share',
+      text2: `${doc.title} can now be shared`,
+      position: 'top',
+      visibilityTime: 2000,
+    });
   };
 
   if (loading) {
@@ -60,8 +92,13 @@ export default function DocumentsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Document Center</Text>
-        <Text style={styles.subtitle}>Access and manage important documents</Text>
+        <View style={styles.headerTop}>
+          
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>Document Center</Text>
+            <Text style={styles.subtitle}>Access and manage important documents</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -92,19 +129,6 @@ export default function DocumentsScreen() {
           ))}
         </ScrollView>
 
-        {/* Quick Stats */}
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{documents.length}</Text>
-            <Text style={styles.statLabel}>Total Documents</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#2563EB' }]}>6</Text>
-            <Text style={styles.statLabel}>Added This Week</Text>
-          </View>
-        </View>
-
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
@@ -115,9 +139,6 @@ export default function DocumentsScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          <Pressable style={styles.filterButton}>
-            <Ionicons name="options-outline" size={20} color="#6B7280" />
-          </Pressable>
         </View>
 
         {/* Document List */}
@@ -156,10 +177,10 @@ export default function DocumentsScreen() {
                 </View>
               </View>
               <View style={styles.modalHeaderRight}>
-                <Pressable style={styles.modalIconButton}>
+                <Pressable style={styles.modalIconButton} onPress={() => handleDownload(previewDoc)}>
                   <Ionicons name="download-outline" size={20} color="white" />
                 </Pressable>
-                <Pressable style={styles.modalIconButton}>
+                <Pressable style={styles.modalIconButton} onPress={() => handleShare(previewDoc)}>
                   <Ionicons name="share-outline" size={20} color="white" />
                 </Pressable>
                 <Pressable style={styles.modalOpenButton}>
@@ -228,6 +249,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerContent: {
+    flex: 1,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -275,34 +307,6 @@ const styles = StyleSheet.create({
   categoryTextActive: {
     color: '#2563EB',
   },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  statItem: {
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 16,
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -322,10 +326,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#111827',
-  },
-  filterButton: {
-    padding: 8,
-    marginLeft: 8,
   },
   documentList: {
     padding: 16,
