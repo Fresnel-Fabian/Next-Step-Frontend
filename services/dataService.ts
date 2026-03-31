@@ -69,6 +69,53 @@ export interface UpdateScheduleData {
 }
 
 // ============================================
+// Types - Schedule Event (calendar events)
+// ============================================
+
+export interface ScheduleEvent {
+  id: number;
+  subject: string;
+  description?: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  professor: string;
+  room?: string;
+  color: string;
+  eventType: string;
+  students: string[];
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateScheduleEventData {
+  subject: string;
+  description?: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  professor: string;
+  room?: string;
+  color?: string;
+  eventType?: string;
+  students?: string[];
+}
+
+export interface UpdateScheduleEventData {
+  subject?: string;
+  description?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  professor?: string;
+  room?: string;
+  color?: string;
+  eventType?: string;
+  students?: string[];
+}
+
+// ============================================
 // Types - Poll
 // ============================================
 
@@ -368,6 +415,60 @@ static async deleteAllActivity(): Promise<void> {
   }
 
   // ========================================
+  // Schedule Events (calendar events)
+  // ========================================
+
+  static async getScheduleEvents(filters?: {
+    date?: string;
+    professor?: string;
+    student?: string;
+  }): Promise<ScheduleEvent[]> {
+    try {
+      const response = await api.get<ScheduleEvent[]>("/api/v1/schedule-events", {
+        params: filters,
+      });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async getScheduleEvent(id: number): Promise<ScheduleEvent> {
+    try {
+      const response = await api.get<ScheduleEvent>(`/api/v1/schedule-events/${id}`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async createScheduleEvent(data: CreateScheduleEventData): Promise<ScheduleEvent> {
+    try {
+      const response = await api.post<ScheduleEvent>("/api/v1/schedule-events", data);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async updateScheduleEvent(id: number, data: UpdateScheduleEventData): Promise<ScheduleEvent> {
+    try {
+      const response = await api.put<ScheduleEvent>(`/api/v1/schedule-events/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  static async deleteScheduleEvent(id: number): Promise<void> {
+    try {
+      await api.delete(`/api/v1/schedule-events/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  // ========================================
   // Documents
   // ========================================
 
@@ -438,7 +539,7 @@ static async deleteAllActivity(): Promise<void> {
   static async getPolls(status?: "active" | "completed"): Promise<Poll[]> {
     try {
       const response = await api.get<Poll[]>("/api/v1/polls", {
-        params: { status },
+        params: { poll_status: status },
       });
       return response.data.map((poll) => ({
         ...poll,

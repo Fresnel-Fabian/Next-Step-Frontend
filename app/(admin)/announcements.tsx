@@ -4,7 +4,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Linking,
     Modal,
     Pressable,
@@ -250,6 +249,8 @@ export default function AdminAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchAnnouncements();
@@ -268,25 +269,22 @@ export default function AdminAnnouncements() {
   };
 
   const handleDelete = (id: number) => {
-    Alert.alert(
-      'Delete Announcement',
-      'Delete this announcement? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            DataService.deleteAnnouncement(id)
-              .then(() => {
-                Toast.show({ type: 'success', text1: 'Announcement deleted' });
-                fetchAnnouncements();
-              })
-              .catch(() => Toast.show({ type: 'error', text1: 'Failed to delete' }));
-          },
-        },
-      ],
-    );
+    setDeleteTarget(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteTarget === null) return;
+    try {
+      setDeleting(true);
+      await DataService.deleteAnnouncement(deleteTarget);
+      Toast.show({ type: 'success', text1: 'Announcement deleted' });
+      setDeleteTarget(null);
+      fetchAnnouncements();
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to delete announcement' });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -327,6 +325,39 @@ export default function AdminAnnouncements() {
         onClose={() => setShowCreate(false)}
         onCreated={fetchAnnouncements}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={deleteTarget !== null} transparent animationType="fade">
+        <View style={styles.deleteOverlay}>
+          <View style={styles.deleteSheet}>
+            <Ionicons name="warning-outline" size={36} color="#EF4444" style={{ alignSelf: 'center' }} />
+            <Text style={styles.deleteTitle}>Delete Announcement</Text>
+            <Text style={styles.deleteMessage}>
+              Are you sure? This cannot be undone.
+            </Text>
+            <View style={styles.deleteActions}>
+              <Pressable
+                style={styles.cancelDeleteBtn}
+                onPress={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                <Text style={styles.cancelDeleteText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmDeleteBtn, deleting && styles.btnDisabled]}
+                onPress={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmDeleteText}>Delete</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -407,4 +438,31 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.6 },
   createBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
+  deleteOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
+  },
+  deleteSheet: {
+    backgroundColor: 'white', borderRadius: 16, padding: 24,
+    width: '100%', maxWidth: 340, gap: 12,
+  },
+  deleteTitle: {
+    fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center',
+  },
+  deleteMessage: {
+    fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20,
+  },
+  deleteActions: {
+    flexDirection: 'row', gap: 12, marginTop: 8,
+  },
+  cancelDeleteBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 10,
+    borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center',
+  },
+  cancelDeleteText: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  confirmDeleteBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 10,
+    backgroundColor: '#EF4444', alignItems: 'center',
+  },
+  confirmDeleteText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 });

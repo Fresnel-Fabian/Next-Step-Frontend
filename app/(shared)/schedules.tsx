@@ -6,13 +6,16 @@ import {
   Pressable,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { DataService } from '@/services/dataService';
+import Toast from 'react-native-toast-message';
 
 // ─── Types ───────────────────────────────────────────────────
 interface ScheduleEvent {
-  id: string;
+  id: number;
   subject: string;
   description: string;
   date: string;
@@ -39,31 +42,6 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-
-const STUDENTS = [
-  'Alice Martin', 'Bob Wilson', 'Carol Taylor',
-  'David Anderson', 'Emma Thomas', 'Frank Miller', 'Grace Lee',
-];
-
-// ─── Sample Data (would come from API in production) ─────────
-const SAMPLE_EVENTS: ScheduleEvent[] = [
-  { id: '1', subject: 'Calculus II', description: 'Chapter 8: Integration techniques', date: getFutureDate(1), startTime: '09:00', endTime: '10:30', professor: 'Dr. Smith', students: ['Alice Martin', 'Bob Wilson', 'Carol Taylor'], color: '#4285F4' },
-  { id: '2', subject: 'Physics Lab', description: 'Electromagnetic induction experiment', date: getFutureDate(1), startTime: '11:00', endTime: '12:30', professor: 'Prof. Williams', students: ['Alice Martin', 'David Anderson', 'Emma Thomas'], color: '#34A853' },
-  { id: '3', subject: 'English Literature', description: 'Shakespeare: Hamlet Act III discussion', date: getFutureDate(2), startTime: '10:00', endTime: '11:00', professor: 'Dr. Johnson', students: ['Bob Wilson', 'Carol Taylor', 'Frank Miller', 'Grace Lee'], color: '#EA4335' },
-  { id: '4', subject: 'Data Structures', description: 'Binary trees and traversal algorithms', date: getFutureDate(2), startTime: '14:00', endTime: '15:30', professor: 'Prof. Davis', students: ['Alice Martin', 'Bob Wilson', 'David Anderson', 'Emma Thomas'], color: '#8B5CF6' },
-  { id: '5', subject: 'Chemistry', description: 'Organic chemistry: Alkenes', date: getFutureDate(3), startTime: '09:00', endTime: '10:00', professor: 'Dr. Brown', students: ['Carol Taylor', 'Emma Thomas', 'Frank Miller'], color: '#FBBC04' },
-  { id: '6', subject: 'Art History', description: 'Renaissance period overview', date: getFutureDate(3), startTime: '13:00', endTime: '14:30', professor: 'Dr. Johnson', students: ['Alice Martin', 'Grace Lee', 'Frank Miller'], color: '#EC4899' },
-  { id: '7', subject: 'Statistics', description: 'Hypothesis testing and p-values', date: getFutureDate(4), startTime: '10:00', endTime: '11:30', professor: 'Dr. Smith', students: ['Bob Wilson', 'David Anderson', 'Grace Lee'], color: '#06B6D4' },
-  { id: '8', subject: 'Calculus II', description: 'Chapter 9: Series and sequences', date: getFutureDate(5), startTime: '09:00', endTime: '10:30', professor: 'Dr. Smith', students: ['Alice Martin', 'Bob Wilson', 'Carol Taylor'], color: '#4285F4' },
-  { id: '9', subject: 'Physics Lab', description: 'Optics and wave phenomena', date: getFutureDate(5), startTime: '11:00', endTime: '12:30', professor: 'Prof. Williams', students: ['Alice Martin', 'David Anderson', 'Emma Thomas'], color: '#34A853' },
-  { id: '10', subject: 'Data Structures', description: 'Graph algorithms: BFS and DFS', date: getFutureDate(0), startTime: '14:00', endTime: '15:30', professor: 'Prof. Davis', students: ['Alice Martin', 'Bob Wilson', 'David Anderson', 'Emma Thomas'], color: '#8B5CF6' },
-];
-
-function getFutureDate(daysFromNow: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  return fmt(d);
-}
 
 // ─── Helpers ─────────────────────────────────────────────────
 const getWeekDates = (date: Date): Date[] => {
@@ -98,9 +76,9 @@ const formatTimeDisplay = (time: string) => {
 };
 
 // ─── Overlap layout ──────────────────────────────────────────
-function computeOverlapLayout(events: ScheduleEvent[]): Map<string, LayoutInfo> {
+function computeOverlapLayout(events: ScheduleEvent[]): Map<number, LayoutInfo> {
   const sorted = [...events].sort((a, b) => timeToMin(a.startTime) - timeToMin(b.startTime));
-  const layout = new Map<string, LayoutInfo>();
+  const layout = new Map<number, LayoutInfo>();
   const groups: ScheduleEvent[][] = [];
 
   for (const ev of sorted) {
@@ -136,19 +114,26 @@ function computeOverlapLayout(events: ScheduleEvent[]): Map<string, LayoutInfo> 
 }
 
 // ─── Student Picker Dropdown ─────────────────────────────────
-function StudentPicker({ value, onSelect }: { value: string; onSelect: (v: string) => void }) {
+function StudentPicker({ value, onSelect, students }: { value: string; onSelect: (v: string) => void; students: string[] }) {
   const [open, setOpen] = useState(false);
   return (
     <View style={sp.wrapper}>
       <Pressable style={sp.trigger} onPress={() => setOpen(!open)}>
         <Ionicons name="person-circle-outline" size={22} color="#4285F4" />
-        <Text style={sp.name} numberOfLines={1}>{value}</Text>
+        <Text style={sp.name} numberOfLines={1}>{value || 'All Students'}</Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#5F6368" />
       </Pressable>
       {open && (
         <View style={sp.list}>
           <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
-            {STUDENTS.map(s => (
+            <Pressable
+              style={[sp.item, !value && sp.itemActive]}
+              onPress={() => { onSelect(''); setOpen(false); }}
+            >
+              <Ionicons name={!value ? 'radio-button-on' : 'radio-button-off'} size={18} color={!value ? '#4285F4' : '#9CA3AF'} />
+              <Text style={[sp.itemText, !value && sp.itemTextActive]}>All Students</Text>
+            </Pressable>
+            {students.map(s => (
               <Pressable
                 key={s}
                 style={[sp.item, s === value && sp.itemActive]}
@@ -259,13 +244,46 @@ export default function StudentScheduleScreen() {
   const [containerWidth, setContainerWidth] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [currentStudent, setCurrentStudent] = useState(STUDENTS[0]);
+  const [currentStudent, setCurrentStudent] = useState('');
   const [detailEvent, setDetailEvent] = useState<ScheduleEvent | null>(null);
+  const [allEvents, setAllEvents] = useState<ScheduleEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
-  // Filter events for current student
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoadingEvents(true);
+      const data = await DataService.getScheduleEvents();
+      setAllEvents(data.map(e => ({
+        id: e.id,
+        subject: e.subject,
+        description: e.description || '',
+        date: e.date,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        professor: e.professor,
+        students: e.students,
+        color: e.color,
+      })));
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to load schedule' });
+    } finally {
+      setLoadingEvents(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+
+  // Extract unique student names from all events
+  const studentNames = useMemo(() => {
+    const names = new Set<string>();
+    allEvents.forEach(e => e.students.forEach(s => names.add(s)));
+    return Array.from(names).sort();
+  }, [allEvents]);
+
+  // Filter events for selected student (empty = all)
   const studentEvents = useMemo(
-    () => SAMPLE_EVENTS.filter(e => e.students.includes(currentStudent)),
-    [currentStudent],
+    () => currentStudent ? allEvents.filter(e => e.students.includes(currentStudent)) : allEvents,
+    [currentStudent, allEvents],
   );
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
@@ -336,7 +354,7 @@ export default function StudentScheduleScreen() {
   return (
     <View style={st.container} onLayout={handleLayout}>
       {/* Student Picker */}
-      <StudentPicker value={currentStudent} onSelect={setCurrentStudent} />
+      <StudentPicker value={currentStudent} onSelect={setCurrentStudent} students={studentNames} />
 
       {/* Week summary strip */}
       <View style={st.summaryStrip}>

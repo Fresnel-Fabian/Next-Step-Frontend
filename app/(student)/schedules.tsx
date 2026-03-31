@@ -5,12 +5,15 @@ import {
   ScrollView,
   Pressable,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { DataService } from '@/services/dataService';
+import Toast from 'react-native-toast-message';
 
 interface ClassEvent {
-  id: string;
+  id: number;
   subject: string;
   professor: string;
   room: string;
@@ -41,32 +44,6 @@ const TYPE_LABELS: Record<string, { label: string; bg: string; color: string }> 
   lab: { label: 'Lab', bg: '#DCFCE7', color: '#16A34A' },
   seminar: { label: 'Seminar', bg: '#FEF3C7', color: '#D97706' },
   tutorial: { label: 'Tutorial', bg: '#F3E8FF', color: '#9333EA' },
-};
-
-// ─── Sample Data (replace with API later) ────────────────────
-const getSampleEvents = (): ClassEvent[] => {
-  const today = new Date();
-  const sun = new Date(today);
-  sun.setDate(today.getDate() - today.getDay());
-
-  const makeDate = (dayOffset: number) => {
-    const d = new Date(sun);
-    d.setDate(sun.getDate() + dayOffset);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
-
-  return [
-    { id: '1', subject: 'Data Structures & Algorithms', professor: 'Dr. Smith', room: 'Room 301', date: makeDate(1), startTime: '09:00', endTime: '10:30', color: '#4285F4', type: 'lecture' },
-    { id: '2', subject: 'Web Development', professor: 'Prof. Williams', room: 'Lab 204', date: makeDate(1), startTime: '11:00', endTime: '13:00', color: '#34A853', type: 'lab' },
-    { id: '3', subject: 'Machine Learning', professor: 'Dr. Johnson', room: 'Room 105', date: makeDate(2), startTime: '09:00', endTime: '11:00', color: '#EA4335', type: 'lecture' },
-    { id: '4', subject: 'Database Systems', professor: 'Prof. Davis', room: 'Room 402', date: makeDate(2), startTime: '14:00', endTime: '15:30', color: '#FBBC04', type: 'seminar' },
-    { id: '5', subject: 'Operating Systems', professor: 'Dr. Brown', room: 'Room 201', date: makeDate(3), startTime: '10:00', endTime: '12:00', color: '#8B5CF6', type: 'lecture' },
-    { id: '6', subject: 'Web Development Lab', professor: 'Prof. Williams', room: 'Lab 204', date: makeDate(3), startTime: '13:00', endTime: '15:00', color: '#34A853', type: 'lab' },
-    { id: '7', subject: 'Algorithms Tutorial', professor: 'Dr. Smith', room: 'Room 301', date: makeDate(4), startTime: '09:00', endTime: '10:00', color: '#4285F4', type: 'tutorial' },
-    { id: '8', subject: 'Machine Learning Lab', professor: 'Dr. Johnson', room: 'Lab 108', date: makeDate(4), startTime: '11:00', endTime: '14:00', color: '#EA4335', type: 'lab' },
-    { id: '9', subject: 'Database Systems', professor: 'Prof. Davis', room: 'Room 402', date: makeDate(5), startTime: '10:00', endTime: '12:00', color: '#FBBC04', type: 'lecture' },
-    { id: '10', subject: 'Operating Systems Lab', professor: 'Dr. Brown', room: 'Lab 303', date: makeDate(5), startTime: '14:00', endTime: '16:00', color: '#8B5CF6', type: 'lab' },
-  ];
 };
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -100,9 +77,9 @@ const formatTimeDisplay = (time: string) => {
   return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
 };
 
-function computeOverlapLayout(events: ClassEvent[]): Map<string, { col: number; totalCols: number }> {
+function computeOverlapLayout(events: ClassEvent[]): Map<number, { col: number; totalCols: number }> {
   const sorted = [...events].sort((a, b) => timeToMin(a.startTime) - timeToMin(b.startTime));
-  const layout = new Map<string, { col: number; totalCols: number }>();
+  const layout = new Map<number, { col: number; totalCols: number }>();
   const groups: ClassEvent[][] = [];
 
   for (const ev of sorted) {
@@ -139,8 +116,32 @@ export default function StudentScheduleScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedEvent, setSelectedEvent] = useState<ClassEvent | null>(null);
+  const [events, setEvents] = useState<ClassEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
-  const events = useMemo(() => getSampleEvents(), []);
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoadingEvents(true);
+      const data = await DataService.getScheduleEvents();
+      setEvents(data.map(e => ({
+        id: e.id,
+        subject: e.subject,
+        professor: e.professor,
+        room: e.room || '',
+        date: e.date,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        color: e.color,
+        type: (e.eventType as ClassEvent['type']) || 'lecture',
+      })));
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to load schedule' });
+    } finally {
+      setLoadingEvents(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
   const w = containerWidth > 0 ? containerWidth : 600;
   const dayColW = viewMode === 'week' ? Math.max((w - TIME_COL_WIDTH) / 7, 40) : w - TIME_COL_WIDTH;

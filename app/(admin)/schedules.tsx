@@ -7,12 +7,15 @@ import {
   Modal,
   TextInput,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { DataService, ScheduleEvent as ScheduleEventDTO } from '@/services/dataService';
+import Toast from 'react-native-toast-message';
 
 interface ScheduleEvent {
-  id: string;
+  id: number;
   subject: string;
   description: string;
   date: string;
@@ -73,9 +76,9 @@ const formatTimeDisplay = (time: string) => {
   return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
 };
 
-function computeOverlapLayout(events: ScheduleEvent[]): Map<string, LayoutInfo> {
+function computeOverlapLayout(events: ScheduleEvent[]): Map<number, LayoutInfo> {
   const sorted = [...events].sort((a, b) => timeToMin(a.startTime) - timeToMin(b.startTime));
-  const layout = new Map<string, LayoutInfo>();
+  const layout = new Map<number, LayoutInfo>();
   const groups: ScheduleEvent[][] = [];
 
   for (const ev of sorted) {
@@ -184,7 +187,9 @@ export default function SchedulesScreen() {
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState(fmt(new Date()));
   const [formError, setFormError] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -192,6 +197,30 @@ export default function SchedulesScreen() {
   const [endTime, setEndTime] = useState('10:00');
   const [professor, setProfessor] = useState('');
   const [students, setStudents] = useState<string[]>([]);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoadingEvents(true);
+      const data = await DataService.getScheduleEvents();
+      setEvents(data.map(e => ({
+        id: e.id,
+        subject: e.subject,
+        description: e.description || '',
+        date: e.date,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        professor: e.professor,
+        students: e.students,
+        color: e.color,
+      })));
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to load schedule events' });
+    } finally {
+      setLoadingEvents(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
   const w = containerWidth > 0 ? containerWidth : 600;
@@ -229,26 +258,46 @@ export default function SchedulesScreen() {
     setProfessor(ev.professor); setStudents(ev.students); setFormError(''); setModalVisible(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!subject.trim()) { setFormError('Please enter a subject'); return; }
     if (!isValidTime(startTime)) { setFormError('Invalid start time (use HH:MM)'); return; }
     if (!isValidTime(endTime)) { setFormError('Invalid end time (use HH:MM)'); return; }
     if (startTime >= endTime) { setFormError('End time must be after start time'); return; }
     setFormError('');
-    if (editingEvent) {
-      setEvents(p => p.map(e => e.id === editingEvent.id
-        ? { ...e, subject: subject.trim(), description: description.trim(), startTime, endTime, professor, students } : e));
-    } else {
-      setEvents(p => [...p, {
-        id: Date.now().toString(), subject: subject.trim(), description: description.trim(),
-        date: selectedDate, startTime, endTime, professor, students,
-        color: EVENT_COLORS[p.length % EVENT_COLORS.length],
-      }]);
+    setSaving(true);
+    try {
+      if (editingEvent) {
+        await DataService.updateScheduleEvent(editingEvent.id, {
+          subject: subject.trim(), description: description.trim(),
+          startTime, endTime, professor, students,
+        });
+        Toast.show({ type: 'success', text1: 'Event updated' });
+      } else {
+        await DataService.createScheduleEvent({
+          subject: subject.trim(), description: description.trim(),
+          date: selectedDate, startTime, endTime, professor, students,
+          color: EVENT_COLORS[events.length % EVENT_COLORS.length],
+        });
+        Toast.show({ type: 'success', text1: 'Event created' });
+      }
+      setModalVisible(false);
+      fetchEvents();
+    } catch {
+      Toast.show({ type: 'error', text1: editingEvent ? 'Failed to update event' : 'Failed to create event' });
+    } finally {
+      setSaving(false);
     }
-    setModalVisible(false);
   };
 
-  const handleDelete = (id: string) => setEvents(p => p.filter(e => e.id !== id));
+  const handleDelete = async (id: number) => {
+    try {
+      await DataService.deleteScheduleEvent(id);
+      Toast.show({ type: 'success', text1: 'Event deleted' });
+      fetchEvents();
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to delete event' });
+    }
+  };
 
   const scrollDone = useRef(false);
   const onGridLayout = useCallback(() => {
@@ -385,7 +434,16 @@ export default function SchedulesScreen() {
             <View style={s.mHdr}>
               <Pressable onPress={() => setModalVisible(false)} hitSlop={8}><Ionicons name="close" size={22} color="#5F6368" /></Pressable>
               <Text style={s.mTitle}>{editingEvent ? 'Edit Event' : 'New Event'}</Text>
-              <Pressable style={s.saveBtn} onPress={handleSave}><Text style={s.saveBtnT}>Save</Text></Pressable>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {editingEvent && (
+                  <Pressable style={s.delBtnHdr} onPress={() => { setModalVisible(false); setDeleteConfirm(editingEvent.id); }}>
+                    <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  </Pressable>
+                )}
+                <Pressable style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
+                  {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnT}>Save</Text>}
+                </Pressable>
+              </View>
             </View>
             {formError ? <View style={s.err}><Ionicons name="alert-circle" size={16} color="#DC2626" /><Text style={s.errT}>{formError}</Text></View> : null}
             <ScrollView style={s.mBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -464,8 +522,9 @@ const s = StyleSheet.create({
   mBox: { backgroundColor: '#fff', borderRadius: 16, width: '90%', maxWidth: 420, maxHeight: '75%', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10, overflow: 'hidden' },
   mHdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
   mTitle: { fontSize: 16, fontWeight: '600', color: '#3C4043' },
-  saveBtn: { backgroundColor: '#4285F4', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 },
+  saveBtn: { backgroundColor: '#4285F4', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6, minWidth: 56, alignItems: 'center' as const, justifyContent: 'center' as const },
   saveBtnT: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  delBtnHdr: { borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 6, padding: 5 },
   mBody: { padding: 16 },
   err: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', paddingHorizontal: 16, paddingVertical: 8 },
   errT: { fontSize: 13, color: '#DC2626', fontWeight: '500' },

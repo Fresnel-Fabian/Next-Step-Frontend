@@ -41,7 +41,7 @@ export default function StaffLayout() {
   const sidebarWidth = collapsed && !mobileOpen ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
 
   const isActive = (route: string) => {
-    const clean = route.replace('/(student)', '').replace('/(shared)', '');
+    const clean = route.replace('/(staff)', '').replace('/(shared)', '');
     return pathname.includes(clean);
   };
 
@@ -109,9 +109,9 @@ export default function StaffLayout() {
           {(!collapsed || mobileOpen) && (
             <View style={styles.userMeta}>
               <Text style={styles.userName} numberOfLines={1}>
-                {user?.name || 'Student'}
+                {user?.name || 'Staff'}
               </Text>
-              <Text style={styles.userRole} numberOfLines={1}>Student</Text>
+              <Text style={styles.userRole} numberOfLines={1}>Staff</Text>
             </View>
           )}
         </View>
