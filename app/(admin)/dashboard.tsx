@@ -1,11 +1,17 @@
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import { ActivityItem } from '@/components/dashboard/ActivityItem';
+import { StatsCard } from '@/components/dashboard/StatsCard';
+import { ActivityLog, DashboardStats, DataService } from '@/services/dataService';
+import { useAuthStore } from '@/store/authStore';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import {
   ActivityIndicator,
-  Pressable,
   Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -27,17 +33,60 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [statsData, activityData] = await Promise.all([
-        DataService.getDashboardStats(),
+      const [scheduleData, activityData] = await Promise.all([
+        DataService.getTodaySchedule(),
         DataService.getRecentActivity(),
       ]);
-      setStats(statsData);
+      setSchedule(scheduleData);
       setActivities(activityData);
+      Toast.show({
+        type: 'success',
+        text1: 'Dashboard Updated',
+        text2: 'Latest data loaded successfully',
+        position: 'top',
+        visibilityTime: 2000,
+      });
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Load Data',
+        text2: 'Please check your connection and try again',
+        position: 'top',
+        visibilityTime: 3000,
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  // Dismiss a single activity item from the feed
+ const handleDismissActivity = async (id: string) => {
+  try {
+    await DataService.deleteActivity(id);
+    setActivities(prev => prev.filter(a => a.id !== id));
+  } catch {
+    Toast.show({ type: 'error', text1: 'Failed to delete activity' });
+  }
+};
+
+const handleClearAll = async () => {
+  try {
+    await DataService.deleteAllActivity();
+    setActivities([]);
+    Toast.show({ type: 'success', text1: 'Activity cleared', position: 'top', visibilityTime: 1500 });
+  } catch {
+    Toast.show({ type: 'error', text1: 'Failed to clear activity' });
+  }
+};
+  const handleLogout = () => {
+    Toast.show({ type: 'info', text1: 'Logging Out', text2: 'See you soon!', position: 'top', visibilityTime: 2000 });
+    setTimeout(() => logout(), 500);
+  };
+
+  const handleRefresh = () => {
+    Toast.show({ type: 'info', text1: 'Refreshing Dashboard', text2: 'Getting latest data...', position: 'top', visibilityTime: 1500 });
+    fetchDashboardData();
   };
 
   if (loading) {
@@ -51,7 +100,10 @@ export default function AdminDashboard() {
   if (!stats) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Failed to load dashboard</Text>
+        <Text style={styles.errorText}>Failed to load dashboard</Text>
+        <Pressable onPress={handleRefresh} style={styles.retryButton}>
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
       </View>
     );
   }
@@ -70,50 +122,24 @@ export default function AdminDashboard() {
       <View style={styles.statsGrid}>
         <View style={styles.statRow}>
           <View style={styles.statHalf}>
-            <StatsCard
-              title="Total Staff"
-              value={stats.totalStaff}
-              subtitle={stats.staffTrend}
-              icon="people-outline"
-              color="#3B82F6"
-            />
+            <StatsCard title="Total Staff" value={stats.totalStaff} subtitle={stats.staffTrend} icon="people-outline" color="#3B82F6" />
           </View>
           <View style={styles.statHalf}>
-            <StatsCard
-              title="Active Schedules"
-              value={stats.activeSchedules}
-              subtitle={stats.schedulesTrend}
-              icon="calendar-outline"
-              color="#10B981"
-            />
+            <StatsCard title="Active Schedules" value={stats.activeSchedules} subtitle={stats.schedulesTrend} icon="calendar-outline" color="#10B981" />
           </View>
         </View>
-
         <View style={styles.statRow}>
           <View style={styles.statHalf}>
-            <StatsCard
-              title="Notifications Sent"
-              value={stats.notificationsSent}
-              subtitle={stats.notificationsTrend}
-              icon="notifications-outline"
-              color="#8B5CF6"
-            />
+            <StatsCard title="Notifications Sent" value={stats.notificationsSent} subtitle={stats.notificationsTrend} icon="notifications-outline" color="#8B5CF6" />
           </View>
           <View style={styles.statHalf}>
-            <StatsCard
-              title="Documents"
-              value={stats.totalDocuments}
-              subtitle={stats.documentsTrend}
-              icon="document-text-outline"
-              color="#F59E0B"
-            />
+            <StatsCard title="Documents" value={stats.totalDocuments} subtitle={stats.documentsTrend} icon="document-text-outline" color="#F59E0B" />
           </View>
         </View>
       </View>
 
       {/* Main Content Area */}
       <View style={styles.mainContent}>
-        {/* Left Column - Quick Actions & Analytics */}
         <View style={styles.leftColumn}>
           {/* Documents Card */}
           <Pressable style={styles.actionCard}>
@@ -156,25 +182,50 @@ export default function AdminDashboard() {
           </View>
         </View>
 
-        {/* Right Column - Recent Activity */}
+        {/* Recent Activity */}
         <View style={styles.activityCard}>
           <View style={styles.activityHeader}>
             <Text style={styles.activityTitle}>Recent Activity</Text>
-            <Pressable>
-              <Text style={styles.viewAllButton}>View All</Text>
-            </Pressable>
+            {/* ✅ Clear all button */}
+            {activities.length > 0 && (
+              <Pressable onPress={handleClearAll}>
+                <Text style={styles.clearAllButton}>Clear All</Text>
+              </Pressable>
+            )}
           </View>
-          <View style={styles.activityList}>
-            {activities.map((activity) => (
-              <ActivityItem
-                key={activity.id}
-                title={activity.title}
-                author={activity.author}
-                timestamp={activity.timestamp}
-              />
-            ))}
-          </View>
+
+          {activities.length === 0 ? (
+            <View style={styles.emptyActivity}>
+              <Ionicons name="checkmark-circle-outline" size={32} color="#D1D5DB" />
+              <Text style={styles.emptyActivityText}>No recent activity</Text>
+            </View>
+          ) : (
+            <View style={styles.activityList}>
+              {activities.map((activity) => (
+                // ✅ Wrap each item with dismiss button
+                <View key={activity.id} style={styles.activityRow}>
+                  <View style={styles.activityItemContainer}>
+                    <ActivityItem
+                      title={activity.title}
+                      author={activity.author}
+                      timestamp={activity.timestamp}
+                    />
+                  </View>
+                  <Pressable
+                    onPress={() => handleDismissActivity(activity.id)}
+                    style={styles.dismissBtn}
+                  >
+                    <Ionicons name="close" size={16} color="#9CA3AF" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
+
+        <Pressable style={styles.submitButton}>
+          <Text style={styles.submitButtonText}>Submit Vote</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -266,6 +317,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
+  actionHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  actionIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  actionText: { gap: 2 },
+  actionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  actionSubtitle: { fontSize: 14, color: '#6B7280' },
   analyticsCard: {
     backgroundColor: 'white',
     padding: 24,
@@ -287,6 +343,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  analyticsHeader: { marginBottom: 16 },
+  chartContainer: { height: 180, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
+  noChartData: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
+  noChartText: { fontSize: 13, color: '#9CA3AF' },
   activityCard: {
     backgroundColor: 'white',
     padding: 24,
@@ -318,4 +378,14 @@ const styles = StyleSheet.create({
   activityList: {
     gap: 0,
   },
+  activityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  activityTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  clearAllButton: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
+  activityList: { gap: 0 },
+  // ✅ New styles for dismiss
+  activityRow: { flexDirection: 'row', alignItems: 'center' },
+  activityItemContainer: { flex: 1 },
+  dismissBtn: { padding: 8 },
+  emptyActivity: { alignItems: 'center', paddingVertical: 20, gap: 8 },
+  emptyActivityText: { fontSize: 13, color: '#9CA3AF' },
 });

@@ -54,6 +54,14 @@ export interface ScheduleDTO {
   lastUpdated: string;
 }
 
+export interface StaffScheduleItem {
+  id: string;
+  time: string;
+  title: string;
+  location: string;
+  isStartingSoon: boolean;
+}
+
 export interface CreateScheduleData {
   department: string;
   class_count: number;
@@ -355,6 +363,24 @@ static async deleteAllActivity(): Promise<void> {
         ...schedule,
         id: String(schedule.id),
         lastUpdated: formatRelativeTime(schedule.lastUpdated),
+      }));
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  }
+
+  /**
+   * Returns today's schedule items for the logged-in staff member,
+   * formatted for the StaffScheduleItem component.
+   */
+  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
+    try {
+      const response = await api.get<StaffScheduleItem[]>(
+        "/api/v1/schedules/today",
+      );
+      return response.data.map((item) => ({
+        ...item,
+        id: String(item.id),
       }));
     } catch (error) {
       throw handleApiError(error);

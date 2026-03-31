@@ -4,32 +4,48 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
-export default function DocumentsScreen() {
+
+export default function AdminDocuments() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(0);
-  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] =
+    useState<DriveCategory>("all");
+  const [sortOption, setSortOption] = useState<SortOption>("viewedByMe_desc");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [driveError, setDriveError] = useState<string | null>(null);
 
-  const categories = ['All Documents', 'Policies', 'Forms', 'Handbooks', 'Resources'];
+  // Animate sort dropdown
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    Animated.timing(dropdownAnim, {
+      toValue: sortMenuOpen ? 1 : 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [sortMenuOpen]);
 
-  const fetchDocuments = async () => {
+  // ─── Load documents by category ──────────────────────────────────────────
+  useEffect(() => {
+    loadDocuments();
+  }, [selectedCategory]);
+
+  const loadDocuments = async (isRefresh = false) => {
     try {
       setLoading(true);
       const data = await DataService.getDocuments();
@@ -52,13 +68,44 @@ export default function DocumentsScreen() {
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const filteredDocuments = documents.filter(doc =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // ─── Re-sort in place without refetching ─────────────────────────────────
+  const handleSortChange = (option: SortOption) => {
+    setSortOption(option);
+    setSortMenuOpen(false);
+    setDocuments((prev) => sortDocuments(prev, option));
+  };
 
+  // ─── Search ───────────────────────────────────────────────────────────────
+  const handleSearch = async (text: string) => {
+    setSearch(text);
+    if (text.length === 0) {
+      loadDocuments();
+      return;
+    }
+    if (text.length >= 2) {
+      try {
+        const results = await searchFiles(text);
+        setDocuments(sortDocuments(results, sortOption));
+      } catch {
+        // fail silently on search
+      }
+    }
+  };
+
+  // ─── Actions ──────────────────────────────────────────────────────────────
+  const handlePreview = async (doc: DocumentItem) => {
+    try {
+      await previewFile(doc);
+    } catch (err: any) {
+      Alert.alert("Preview failed", err.message);
+    }
+  };
+
+  //  UPDATED: Download with toast notification
   const handleDownload = (doc: DocumentItem) => {
     console.log('Download:', doc.title);
     Toast.show({
@@ -90,7 +137,7 @@ export default function DocumentsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header - UPDATED */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           
@@ -101,33 +148,41 @@ export default function DocumentsScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Categories */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesScroll}
-          contentContainerStyle={styles.categoriesContent}
-        >
-          {categories.map((cat, idx) => (
+      {/* Category chips */}
+      <FlatList
+        data={CATEGORIES}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.value}
+        contentContainerStyle={styles.categoriesContainer}
+        style={styles.categoriesList}
+        renderItem={({ item }) => {
+          const isActive = selectedCategory === item.value;
+          return (
             <Pressable
-              key={cat}
               style={[
-                styles.categoryButton,
-                selectedCategory === idx && styles.categoryButtonActive
+                styles.categoryChip,
+                isActive && styles.categoryChipActive,
               ]}
-              onPress={() => setSelectedCategory(idx)}
+              onPress={() => setSelectedCategory(item.value)}
             >
-              {selectedCategory === idx && <View style={styles.categoryDot} />}
-              <Text style={[
-                styles.categoryText,
-                selectedCategory === idx && styles.categoryTextActive
-              ]}>
-                {cat}
+              <Ionicons
+                name={item.icon as any}
+                size={14}
+                color={isActive ? "white" : "#6B7280"}
+              />
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  isActive && styles.categoryChipTextActive,
+                ]}
+              >
+                {item.label}
               </Text>
             </Pressable>
-          ))}
-        </ScrollView>
+          );
+        }}
+      />
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -147,7 +202,7 @@ export default function DocumentsScreen() {
             <DocumentListItem
               key={doc.id}
               document={doc}
-              onPreview={() => setPreviewDoc(doc)}
+              onPreview={() => handlePreview(doc)}
               onDownload={() => handleDownload(doc)}
             />
           ))}
@@ -231,12 +286,13 @@ export default function DocumentsScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
-  loadingContainer: {
+  centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -268,55 +324,42 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
   },
-  content: {
-    flex: 1,
+  listContent: {
+    padding: 16,
+    paddingBottom: 32,
   },
-  categoriesScroll: {
-    maxHeight: 50,
-    marginTop: 16,
+  pageHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
   },
-  categoriesContent: {
-    paddingHorizontal: 16,
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  pageSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: 'white',
-    gap: 8,
-  },
-  categoryButtonActive: {
-    backgroundColor: '#EFF6FF',
-  },
-  categoryDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#2563EB',
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  categoryTextActive: {
-    color: '#2563EB',
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    height: 44,
   },
   searchIcon: {
     marginRight: 8,
@@ -353,112 +396,55 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'white',
-    flex: 1,
+  categoriesList: {
+    marginBottom: 12,
   },
-  modalSizeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+  categoriesContainer: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
   },
-  modalSizeText: {
+  categoryChipActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6B7280",
+  },
+  categoryChipTextActive: {
+    color: "white",
+  },
+  summaryText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
+    marginBottom: 12,
   },
-  modalHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  emptyContainer: {
+    alignItems: "center",
+    paddingTop: 60,
+    gap: 8,
   },
-  modalIconButton: {
-    padding: 4,
-  },
-  modalOpenButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  modalOpenButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalContent: {
-    flex: 1,
-  },
-  modalContentInner: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  previewDocument: {
-    backgroundColor: 'white',
-    width: '100%',
-    maxWidth: 600,
-    padding: 48,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  previewTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  previewCategory: {
-    fontSize: 14,
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  previewTOC: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 32,
-    marginVertical: 32,
-  },
-  previewTOCTitle: {
+  emptyTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
+    fontWeight: "600",
+    color: "#374151",
   },
-  previewTOCList: {
-    gap: 16,
-  },
-  previewTOCItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  previewTOCText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  previewTOCPage: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  previewNote: {
-    backgroundColor: '#EFF6FF',
-    padding: 16,
-    borderRadius: 8,
-  },
-  previewNoteText: {
-    fontSize: 14,
-    color: '#1E40AF',
-    textAlign: 'center',
+  emptySubtitle: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
 });
