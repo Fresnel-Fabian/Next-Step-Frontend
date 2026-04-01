@@ -8,6 +8,7 @@ export const GoogleAuthConfig = {
     "53409583700-4ft6430vf0bibt6pmo29l6nqvbuhhvuv.apps.googleusercontent.com",
 
   scopes: [
+    "openid",
     "profile",
     "email",
     "https://www.googleapis.com/auth/drive.readonly",

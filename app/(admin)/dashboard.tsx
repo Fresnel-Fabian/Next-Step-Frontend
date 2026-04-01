@@ -6,22 +6,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useState, useEffect } from 'react';
-import { useAuthStore } from '@/store/authStore';
-import { DataService, DashboardStats, ActivityLog } from '@/services/dataService';
-import { StatsCard } from '@/components/dashboard/StatsCard';
-import { ActivityItem } from '@/components/dashboard/ActivityItem';
-import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 
 export default function AdminDashboard() {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,11 +27,11 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [scheduleData, activityData] = await Promise.all([
-        DataService.getTodaySchedule(),
+      const [statsData, activityData] = await Promise.all([
+        DataService.getDashboardStats(),
         DataService.getRecentActivity(),
       ]);
-      setSchedule(scheduleData);
+      setStats(statsData);
       setActivities(activityData);
       Toast.show({
         type: 'success',
@@ -223,9 +217,6 @@ const handleClearAll = async () => {
           )}
         </View>
 
-        <Pressable style={styles.submitButton}>
-          <Text style={styles.submitButtonText}>Submit Vote</Text>
-        </Pressable>
       </View>
     </ScrollView>
   );
@@ -317,11 +308,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
-  actionHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  actionIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  actionText: { gap: 2 },
-  actionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  actionSubtitle: { fontSize: 14, color: '#6B7280' },
   analyticsCard: {
     backgroundColor: 'white',
     padding: 24,
@@ -343,10 +329,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  analyticsHeader: { marginBottom: 16 },
-  chartContainer: { height: 180, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
-  noChartData: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  noChartText: { fontSize: 13, color: '#9CA3AF' },
   activityCard: {
     backgroundColor: 'white',
     padding: 24,
@@ -378,14 +360,14 @@ const styles = StyleSheet.create({
   activityList: {
     gap: 0,
   },
-  activityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  activityTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   clearAllButton: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
-  activityList: { gap: 0 },
   // ✅ New styles for dismiss
   activityRow: { flexDirection: 'row', alignItems: 'center' },
   activityItemContainer: { flex: 1 },
   dismissBtn: { padding: 8 },
   emptyActivity: { alignItems: 'center', paddingVertical: 20, gap: 8 },
   emptyActivityText: { fontSize: 13, color: '#9CA3AF' },
+  errorText: { fontSize: 16, color: '#6B7280', marginBottom: 16 },
+  retryButton: { backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  retryText: { color: 'white', fontSize: 14, fontWeight: '600' },
 });

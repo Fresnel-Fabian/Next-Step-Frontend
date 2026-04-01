@@ -1,7 +1,6 @@
 import { DocumentListItem } from '@/components/documents/DocumentListItem';
 import { DataService, DocumentItem } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,34 +17,15 @@ import Toast from 'react-native-toast-message';
 
 export default function AdminDocuments() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] =
-    useState<DriveCategory>("all");
-  const [sortOption, setSortOption] = useState<SortOption>("viewedByMe_desc");
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const [driveError, setDriveError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
 
-  // Animate sort dropdown
-  const dropdownAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(dropdownAnim, {
-      toValue: sortMenuOpen ? 1 : 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  }, [sortMenuOpen]);
-
-  // ─── Load documents by category ──────────────────────────────────────────
   useEffect(() => {
     loadDocuments();
-  }, [selectedCategory]);
+  }, []);
 
-  const loadDocuments = async (isRefresh = false) => {
+  const loadDocuments = async () => {
     try {
       setLoading(true);
       const data = await DataService.getDocuments();
@@ -68,44 +48,13 @@ export default function AdminDocuments() {
       });
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  // ─── Re-sort in place without refetching ─────────────────────────────────
-  const handleSortChange = (option: SortOption) => {
-    setSortOption(option);
-    setSortMenuOpen(false);
-    setDocuments((prev) => sortDocuments(prev, option));
+  const handlePreview = (doc: DocumentItem) => {
+    setPreviewDoc(doc);
   };
 
-  // ─── Search ───────────────────────────────────────────────────────────────
-  const handleSearch = async (text: string) => {
-    setSearch(text);
-    if (text.length === 0) {
-      loadDocuments();
-      return;
-    }
-    if (text.length >= 2) {
-      try {
-        const results = await searchFiles(text);
-        setDocuments(sortDocuments(results, sortOption));
-      } catch {
-        // fail silently on search
-      }
-    }
-  };
-
-  // ─── Actions ──────────────────────────────────────────────────────────────
-  const handlePreview = async (doc: DocumentItem) => {
-    try {
-      await previewFile(doc);
-    } catch (err: any) {
-      Alert.alert("Preview failed", err.message);
-    }
-  };
-
-  //  UPDATED: Download with toast notification
   const handleDownload = (doc: DocumentItem) => {
     console.log('Download:', doc.title);
     Toast.show({
@@ -127,6 +76,10 @@ export default function AdminDocuments() {
     });
   };
 
+  const filteredDocuments = documents.filter((doc) =>
+    doc.title.toLowerCase().includes(search.toLowerCase()),
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -137,10 +90,9 @@ export default function AdminDocuments() {
 
   return (
     <View style={styles.container}>
-      {/* Header - UPDATED */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          
           <View style={styles.headerContent}>
             <Text style={styles.title}>Document Center</Text>
             <Text style={styles.subtitle}>Access and manage important documents</Text>
@@ -148,42 +100,7 @@ export default function AdminDocuments() {
         </View>
       </View>
 
-      {/* Category chips */}
-      <FlatList
-        data={CATEGORIES}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.value}
-        contentContainerStyle={styles.categoriesContainer}
-        style={styles.categoriesList}
-        renderItem={({ item }) => {
-          const isActive = selectedCategory === item.value;
-          return (
-            <Pressable
-              style={[
-                styles.categoryChip,
-                isActive && styles.categoryChipActive,
-              ]}
-              onPress={() => setSelectedCategory(item.value)}
-            >
-              <Ionicons
-                name={item.icon as any}
-                size={14}
-                color={isActive ? "white" : "#6B7280"}
-              />
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  isActive && styles.categoryChipTextActive,
-                ]}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        }}
-      />
-
+      <ScrollView contentContainerStyle={styles.listContent}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
@@ -191,21 +108,31 @@ export default function AdminDocuments() {
             style={styles.searchInput}
             placeholder="Search documents..."
             placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+            value={search}
+            onChangeText={setSearch}
           />
         </View>
 
         {/* Document List */}
         <View style={styles.documentList}>
-          {filteredDocuments.map((doc) => (
-            <DocumentListItem
-              key={doc.id}
-              document={doc}
-              onPreview={() => handlePreview(doc)}
-              onDownload={() => handleDownload(doc)}
-            />
-          ))}
+          {filteredDocuments.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No documents found</Text>
+              <Text style={styles.emptySubtitle}>
+                {search ? 'Try a different search term' : 'Documents will appear here'}
+              </Text>
+            </View>
+          ) : (
+            filteredDocuments.map((doc) => (
+              <DocumentListItem
+                key={doc.id}
+                document={doc}
+                onPreview={() => handlePreview(doc)}
+                onDownload={() => handleDownload(doc)}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -290,9 +217,9 @@ export default function AdminDocuments() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: '#F9FAFB',
   },
-  centered: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -310,9 +237,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  backButton: {
-    padding: 8,
-  },
   headerContent: {
     flex: 1,
   },
@@ -324,39 +248,19 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
+    color: '#6B7280',
   },
   listContent: {
     padding: 16,
     paddingBottom: 32,
   },
-  pageHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#111827",
-    marginBottom: 2,
-  },
-  pageSubtitle: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: '#E5E7EB',
     paddingHorizontal: 12,
     marginBottom: 12,
     height: 44,
@@ -371,7 +275,23 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   documentList: {
-    padding: 16,
+    gap: 0,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   modalContainer: {
     flex: 1,
@@ -393,58 +313,103 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 16,
   },
+  modalHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   closeButton: {
     padding: 4,
   },
-  categoriesList: {
-    marginBottom: 12,
-  },
-  categoriesContainer: {
-    gap: 8,
-    paddingRight: 4,
-  },
-  categoryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "white",
-  },
-  categoryChipActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
-  },
-  categoryChipText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#6B7280",
-  },
-  categoryChipTextActive: {
-    color: "white",
-  },
-  summaryText: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginBottom: 12,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    paddingTop: 60,
-    gap: 8,
-  },
-  emptyTitle: {
+  modalTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#374151",
+    fontWeight: '600',
+    color: 'white',
+    flex: 1,
   },
-  emptySubtitle: {
+  modalSizeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  modalSizeText: {
+    fontSize: 11,
+    color: 'white',
+    fontWeight: '500',
+  },
+  modalIconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  modalOpenButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+  },
+  modalOpenButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+  },
+  modalContent: {
+    flex: 1,
+  },
+  modalContentInner: {
+    padding: 24,
+  },
+  previewDocument: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 24,
+    gap: 16,
+  },
+  previewTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  previewCategory: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  previewTOC: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    gap: 12,
+  },
+  previewTOCTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  previewTOCList: {
+    gap: 8,
+  },
+  previewTOCItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  previewTOCText: {
     fontSize: 13,
-    color: "#9CA3AF",
-    textAlign: "center",
-    paddingHorizontal: 24,
+    color: '#4B5563',
+  },
+  previewTOCPage: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  previewNote: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 12,
+  },
+  previewNoteText: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 18,
   },
 });

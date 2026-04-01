@@ -3,7 +3,7 @@
  */
 
 import { CreateDocumentData, DocumentItem } from "@/types/document";
-import api, { handleApiError } from "./api";
+import api, { API_BASE_URL, handleApiError } from "./api";
 
 // ============================================
 // Re-export DocumentItem so existing imports work
@@ -52,14 +52,6 @@ export interface ScheduleDTO {
   staffCount: number;
   status: string;
   lastUpdated: string;
-}
-
-export interface StaffScheduleItem {
-  id: string;
-  time: string;
-  title: string;
-  location: string;
-  isStartingSoon: boolean;
 }
 
 export interface CreateScheduleData {
@@ -363,24 +355,6 @@ static async deleteAllActivity(): Promise<void> {
         ...schedule,
         id: String(schedule.id),
         lastUpdated: formatRelativeTime(schedule.lastUpdated),
-      }));
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  }
-
-  /**
-   * Returns today's schedule items for the logged-in staff member,
-   * formatted for the StaffScheduleItem component.
-   */
-  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
-    try {
-      const response = await api.get<StaffScheduleItem[]>(
-        "/api/v1/schedules/today",
-      );
-      return response.data.map((item) => ({
-        ...item,
-        id: String(item.id),
       }));
     } catch (error) {
       throw handleApiError(error);
@@ -704,7 +678,7 @@ static async deleteAllActivity(): Promise<void> {
     }
 
     // Use native fetch — NOT axios — so browser sets correct multipart boundary
-    const response = await fetch('http://localhost:8000/api/v1/documents/upload', {
+    const response = await fetch(`${API_BASE_URL}api/v1/documents/upload`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
