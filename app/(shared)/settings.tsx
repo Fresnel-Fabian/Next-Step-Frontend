@@ -198,9 +198,6 @@ export default function SettingsScreen() {
         <View style={styles.header}>
           {/*  ADD BACK BUTTON */}
           <View style={styles.headerTop}>
-            <Pressable onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#111827" />
-            </Pressable>
             <View style={styles.headerContent}>
               <Text style={styles.title}>Settings</Text>
               <Text style={styles.subtitle}>Manage your account and preferences</Text>

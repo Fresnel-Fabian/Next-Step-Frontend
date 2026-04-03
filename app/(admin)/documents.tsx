@@ -1,2 +1,1 @@
-// app/(admin)/documents.tsx
-export { default } from '@/app/(shared)/documents';
+export { default } from '../(shared)/documents';

@@ -6,14 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { BarChart } from 'react-native-chart-kit';
 import Toast from 'react-native-toast-message';
 
 export default function AdminDashboard() {
@@ -172,38 +170,17 @@ const handleClearAll = async () => {
                 </View>
               </View>
             </View>
-            <View style={styles.chartContainer}>
-              {stats.chartData && stats.chartData.length > 0 ? (
-                <BarChart
-                  data={{
-                    labels: stats.chartData.map(d => d.name),
-                    datasets: [{ data: stats.chartData.map(d => d.active) }],
-                  }}
-                  width={Dimensions.get('window').width - 80}
-                  height={160}
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  chartConfig={{
-                    backgroundColor: '#ffffff',
-                    backgroundGradientFrom: '#ffffff',
-                    backgroundGradientTo: '#ffffff',
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                    style: { borderRadius: 16 },
-                    barPercentage: 0.5,
-                  }}
-                  style={{ marginVertical: 8, borderRadius: 16 }}
-                  showValuesOnTopOfBars
-                  withInnerLines={false}
-                />
-              ) : (
-                <View style={styles.noChartData}>
-                  <Ionicons name="bar-chart-outline" size={32} color="#D1D5DB" />
-                  <Text style={styles.noChartText}>No activity data yet</Text>
-                </View>
-              )}
-            </View>
+
+            {/* Chart - with safe guard */}
+            {stats.chartData && stats.chartData.length > 0 ? (
+              <View style={styles.chartContainer}>
+                <Text style={{ color: '#9CA3AF' }}>Chart loaded</Text>
+              </View>
+            ) : (
+              <View style={styles.chartContainer}>
+                <Text style={{ color: '#9CA3AF', marginTop: 40 }}>No chart data available</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -254,56 +231,151 @@ const handleClearAll = async () => {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  content: { padding: 16 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
-  errorText: { fontSize: 16, color: '#EF4444', marginBottom: 16 },
-  retryButton: { backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  retryText: { color: 'white', fontWeight: '600' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  refreshButton: { padding: 8 },
-  greeting: { fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
-  subGreeting: { fontSize: 14, color: '#6B7280' },
-  logoutButton: { padding: 8 },
-  statsGrid: { marginBottom: 24 },
-  statRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  statHalf: { flex: 1 },
-  mainContent: { gap: 16 },
-  leftColumn: { gap: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  content: {
+    padding: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  greeting: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  subGreeting: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  statsGrid: {
+    marginBottom: 28,
+  },
+  statRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  statHalf: {
+    flex: 1,
+  },
+  mainContent: {
+    gap: 20,
+  },
+  leftColumn: {
+    gap: 20,
+  },
   actionCard: {
-    backgroundColor: 'white', padding: 20, borderRadius: 12, borderWidth: 1,
-    borderColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  actionHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  actionIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  actionText: { gap: 2 },
-  actionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  actionSubtitle: { fontSize: 14, color: '#6B7280' },
+  actionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionText: {
+    gap: 2,
+  },
+  actionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  actionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
   analyticsCard: {
-    backgroundColor: 'white', padding: 20, borderRadius: 12, borderWidth: 1,
-    borderColor: '#F3F4F6', shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  analyticsHeader: { marginBottom: 16 },
-  chartContainer: { height: 180, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
-  noChartData: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  noChartText: { fontSize: 13, color: '#9CA3AF' },
+  analyticsHeader: {
+    marginBottom: 20,
+  },
+  chartContainer: {
+    height: 180,
+    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   activityCard: {
-    backgroundColor: 'white', padding: 20, borderRadius: 12, borderWidth: 1,
-    borderColor: '#F3F4F6', shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  activityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  activityTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  activityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  activityTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  viewAllButton: {
+    fontSize: 12,
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  activityList: {
+    gap: 0,
+  },
   clearAllButton: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
-  activityList: { gap: 0 },
   // ✅ New styles for dismiss
   activityRow: { flexDirection: 'row', alignItems: 'center' },
   activityItemContainer: { flex: 1 },
   dismissBtn: { padding: 8 },
   emptyActivity: { alignItems: 'center', paddingVertical: 20, gap: 8 },
   emptyActivityText: { fontSize: 13, color: '#9CA3AF' },
+  errorText: { fontSize: 16, color: '#6B7280', marginBottom: 16 },
+  retryButton: { backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  retryText: { color: 'white', fontSize: 14, fontWeight: '600' },
 });

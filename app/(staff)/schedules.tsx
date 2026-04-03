@@ -1,3 +1,4 @@
-// app/(staff)/schedules.tsx
-export { default } from '@/app/(shared)/schedules';
 
+import StudentScheduleScreen from '../(shared)/schedules';
+
+export default StudentScheduleScreen;

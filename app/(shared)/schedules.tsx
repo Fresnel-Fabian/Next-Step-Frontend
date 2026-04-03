@@ -1,568 +1,634 @@
-import { DataService } from '@/services/dataService';
-import { ScheduleDTO } from '@/types/schedule';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
   View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Modal,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { DataService } from '@/services/dataService';
 import Toast from 'react-native-toast-message';
 
-export default function SchedulesScreen() {
-  const router = useRouter(); //  ADD THIS
-  const [schedules, setSchedules] = useState<ScheduleDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+// ─── Types ───────────────────────────────────────────────────
+interface ScheduleEvent {
+  id: number;
+  subject: string;
+  description: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  professor: string;
+  students: string[];
+  color: string;
+}
 
-  useEffect(() => {
-    fetchSchedules();
-  }, []);
+interface LayoutInfo { col: number; totalCols: number; }
+type ViewMode = 'week' | 'day';
 
-  const fetchSchedules = async () => {
-    try {
-      setLoading(true);
-      const data = await DataService.getSchedules();
-      setSchedules(data);
-      // NEW: Success toast when schedules load
-      Toast.show({
-        type: 'success',
-        text1: 'Schedules Loaded',
-        text2: `${data.length} schedule${data.length > 1 ? 's' : ''} available`,
-        position: 'top',
-        visibilityTime: 2000,
-      });
-    } catch (error) {
-      console.error('Failed to fetch schedules:', error);
-      // NEW: Error toast when fetch fails
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to Load Schedules',
-        text2: 'Please check your connection',
-        position: 'top',
-        visibilityTime: 3000,
-      });
-    } finally {
-      setLoading(false);
+// ─── Constants ───────────────────────────────────────────────
+const HOUR_HEIGHT = 72;
+const TIME_COL_WIDTH = 56;
+const START_HOUR = 6;
+const END_HOUR = 22;
+const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
+const GRID_HEIGHT = HOURS.length * HOUR_HEIGHT;
+const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+// ─── Helpers ─────────────────────────────────────────────────
+const getWeekDates = (date: Date): Date[] => {
+  const d = new Date(date);
+  const sun = new Date(d);
+  sun.setDate(d.getDate() - d.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const dd = new Date(sun);
+    dd.setDate(sun.getDate() + i);
+    return dd;
+  });
+};
+
+function fmt(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const isToday = (d: Date) => fmt(d) === fmt(new Date());
+const timeToMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+
+const formatHour = (h: number) => {
+  if (h === 0) return '12 AM';
+  if (h === 12) return '12 PM';
+  return `${h > 12 ? h - 12 : h} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
+const formatTimeDisplay = (time: string) => {
+  const [h, m] = time.split(':').map(Number);
+  const suffix = h >= 12 ? 'pm' : 'am';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
+};
+
+// ─── Overlap layout ──────────────────────────────────────────
+function computeOverlapLayout(events: ScheduleEvent[]): Map<number, LayoutInfo> {
+  const sorted = [...events].sort((a, b) => timeToMin(a.startTime) - timeToMin(b.startTime));
+  const layout = new Map<number, LayoutInfo>();
+  const groups: ScheduleEvent[][] = [];
+
+  for (const ev of sorted) {
+    let placed = false;
+    for (const group of groups) {
+      if (group.some(g => timeToMin(ev.startTime) < timeToMin(g.endTime) && timeToMin(ev.endTime) > timeToMin(g.startTime))) {
+        group.push(ev); placed = true; break;
+      }
     }
-  };
-
-  //  UPDATED: Create with toast
-  const handleCreate = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Create Schedule',
-      text2: 'This feature is coming soon',
-      position: 'top',
-      visibilityTime: 2000,
-    });
-    // Alert.alert('Coming Soon', 'Create schedule feature');
-  };
-
-  //  UPDATED: Export with toast
-  const handleExport = () => {
-    Toast.show({
-      type: 'success',
-      text1: 'Exporting Schedules',
-      text2: 'Your schedule data is being prepared...',
-      position: 'top',
-      visibilityTime: 2000,
-    });
-    
-    // Simulate export completion
-    setTimeout(() => {
-      Toast.show({
-        type: 'success',
-        text1: 'Export Complete',
-        text2: 'Schedule data has been exported',
-        position: 'top',
-        visibilityTime: 2000,
-      });
-    }, 2000);
-  };
-
-  // UPDATED: Filter with toast
-  const handleFilter = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Filter Options',
-      text2: 'Advanced filters coming soon',
-      position: 'top',
-      visibilityTime: 2000,
-    });
-  };
-
-  // UPDATED: Edit with toast
-  const handleEdit = (id: string) => {
-    Toast.show({
-      type: 'info',
-      text1: 'Edit Schedule',
-      text2: `Opening editor for schedule ${id}`,
-      position: 'top',
-      visibilityTime: 2000,
-    });
-  };
-
-  // UPDATED: View with toast
-  const handleView = (id: string) => {
-    Toast.show({
-      type: 'info',
-      text1: 'View Details',
-      text2: 'Opening schedule details',
-      position: 'top',
-      visibilityTime: 1500,
-    });
-  };
-
-  // UPDATED: Sync with toast
-  const handleSync = (id: string) => {
-    Toast.show({
-      type: 'success',
-      text1: 'Syncing Schedule',
-      text2: 'Sending to all staff devices...',
-      position: 'top',
-      visibilityTime: 2000,
-    });
-    
-    // Simulate sync completion
-    setTimeout(() => {
-      Toast.show({
-        type: 'success',
-        text1: 'Sync Complete',
-        text2: 'Schedule synced to all devices',
-        position: 'top',
-        visibilityTime: 2000,
-      });
-    }, 2000);
-  };
-
-  // UPDATED: Delete with toast
-  const handleDelete = async (id: string) => {
-    Alert.alert(
-      'Delete Schedule',
-      'Are you sure you want to delete this schedule?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await DataService.deleteSchedule(id);
-              setSchedules(prev => prev.filter(s => s.id !== id));
-              
-              // NEW: Success toast after delete
-              Toast.show({
-                type: 'success',
-                text1: 'Schedule Deleted',
-                text2: 'Schedule removed successfully',
-                position: 'top',
-                visibilityTime: 2000,
-              });
-            } catch (error) {
-              //  NEW: Error toast if delete fails
-              Toast.show({
-                type: 'error',
-                text1: 'Delete Failed',
-                text2: 'Could not delete schedule',
-                position: 'top',
-                visibilityTime: 3000,
-              });
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const filteredSchedules = schedules.filter(s =>
-    s.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalClasses = schedules.reduce((acc, s) => acc + s.classCount, 0);
-  const totalStaff = schedules.reduce((acc, s) => acc + s.staffCount, 0);
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
-    );
+    if (!placed) groups.push([ev]);
   }
 
+  for (const group of groups) {
+    const columns: ScheduleEvent[][] = [];
+    for (const ev of group) {
+      let placedInCol = false;
+      for (let c = 0; c < columns.length; c++) {
+        const last = columns[c][columns[c].length - 1];
+        if (timeToMin(ev.startTime) >= timeToMin(last.endTime)) {
+          columns[c].push(ev);
+          layout.set(ev.id, { col: c, totalCols: 0 });
+          placedInCol = true; break;
+        }
+      }
+      if (!placedInCol) {
+        layout.set(ev.id, { col: columns.length, totalCols: 0 });
+        columns.push([ev]);
+      }
+    }
+    for (const ev of group) { layout.get(ev.id)!.totalCols = columns.length; }
+  }
+  return layout;
+}
+
+// ─── Student Picker Dropdown ─────────────────────────────────
+function StudentPicker({ value, onSelect, students }: { value: string; onSelect: (v: string) => void; students: string[] }) {
+  const [open, setOpen] = useState(false);
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Header - UPDATED */}
-        <View style={styles.header}>
-          {/*  ADD BACK BUTTON */}
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#111827" />
-          </Pressable>
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>Schedule Management</Text>
-            <Text style={styles.subtitle}>Create and manage class schedules</Text>
-          </View>
-          <Pressable style={styles.createButton} onPress={handleCreate}>
-            <Ionicons name="add" size={20} color="white" />
-            <Text style={styles.createButtonText}>Create</Text>
-          </Pressable>
+    <View style={sp.wrapper}>
+      <Pressable style={sp.trigger} onPress={() => setOpen(!open)}>
+        <Ionicons name="person-circle-outline" size={22} color="#4285F4" />
+        <Text style={sp.name} numberOfLines={1}>{value || 'All Students'}</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#5F6368" />
+      </Pressable>
+      {open && (
+        <View style={sp.list}>
+          <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
+            <Pressable
+              style={[sp.item, !value && sp.itemActive]}
+              onPress={() => { onSelect(''); setOpen(false); }}
+            >
+              <Ionicons name={!value ? 'radio-button-on' : 'radio-button-off'} size={18} color={!value ? '#4285F4' : '#9CA3AF'} />
+              <Text style={[sp.itemText, !value && sp.itemTextActive]}>All Students</Text>
+            </Pressable>
+            {students.map(s => (
+              <Pressable
+                key={s}
+                style={[sp.item, s === value && sp.itemActive]}
+                onPress={() => { onSelect(s); setOpen(false); }}
+              >
+                <Ionicons
+                  name={s === value ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={s === value ? '#4285F4' : '#9CA3AF'}
+                />
+                <Text style={[sp.itemText, s === value && sp.itemTextActive]}>{s}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Total Schedules</Text>
-            <Text style={styles.statValue}>{schedules.length}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Active Classes</Text>
-            <Text style={styles.statValue}>{totalClasses}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Staff Assigned</Text>
-            <Text style={styles.statValue}>{totalStaff}</Text>
-          </View>
-        </View>
-
-        {/* Search & Actions */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search schedules..."
-              placeholderTextColor="#9CA3AF"
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-            />
-          </View>
-        </View>
-
-        <View style={styles.actionButtons}>
-          <Pressable style={styles.actionButton} onPress={handleFilter}>
-            <Ionicons name="options-outline" size={16} color="#6B7280" />
-            <Text style={styles.actionButtonText}>Filter</Text>
-          </Pressable>
-          <Pressable style={styles.actionButton} onPress={handleExport}>
-            <Ionicons name="download-outline" size={16} color="#6B7280" />
-            <Text style={styles.actionButtonText}>Export</Text>
-          </Pressable>
-        </View>
-
-        {/* Schedule List */}
-        <View style={styles.scheduleList}>
-          {filteredSchedules.map((schedule) => (
-            <View key={schedule.id} style={styles.scheduleCard}>
-              {/* Header */}
-              <View style={styles.scheduleHeader}>
-                <View style={styles.scheduleHeaderLeft}>
-                  <Text style={styles.scheduleDepartment}>{schedule.department}</Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      schedule.status === 'Active'
-                        ? styles.statusBadgeActive
-                        : styles.statusBadgeDraft,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusText,
-                        schedule.status === 'Active'
-                          ? styles.statusTextActive
-                          : styles.statusTextDraft,
-                      ]}
-                    >
-                      {schedule.status}
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  onPress={() => handleDelete(schedule.id)}
-                  style={styles.deleteButton}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                </Pressable>
-              </View>
-
-              {/* Info */}
-              <View style={styles.scheduleInfo}>
-                <View style={styles.infoItem}>
-                  <Ionicons name="calendar-outline" size={16} color="#9CA3AF" />
-                  <Text style={styles.infoText}>{schedule.classCount} classes</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Ionicons name="people-outline" size={16} color="#9CA3AF" />
-                  <Text style={styles.infoText}>{schedule.staffCount} staff</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Ionicons name="time-outline" size={16} color="#9CA3AF" />
-                  <Text style={styles.infoText}>Updated {schedule.lastUpdated}</Text>
-                </View>
-              </View>
-
-              {/* Actions */}
-              <View style={styles.scheduleActions}>
-                <Pressable
-                  style={styles.scheduleActionButton}
-                  onPress={() => handleEdit(schedule.id)}
-                >
-                  <Ionicons name="create-outline" size={16} color="#2563EB" />
-                  <Text style={styles.scheduleActionText}>Edit</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.scheduleActionButton}
-                  onPress={() => handleView(schedule.id)}
-                >
-                  <Ionicons name="eye-outline" size={16} color="#6B7280" />
-                  <Text style={[styles.scheduleActionText, styles.scheduleActionTextSecondary]}>
-                    View
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={styles.scheduleActionButton}
-                  onPress={() => handleSync(schedule.id)}
-                >
-                  <Ionicons name="sync-outline" size={16} color="#3B82F6" />
-                  <Text style={[styles.scheduleActionText, styles.scheduleActionTextBlue]}>
-                    Sync
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
+// ─── Event Detail Modal ──────────────────────────────────────
+function EventDetailModal({
+  event,
+  visible,
+  onClose,
+}: {
+  event: ScheduleEvent | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  if (!event) return null;
+
+  const dateObj = new Date(event.date + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={st.overlay} onPress={onClose}>
+        <Pressable style={dm.box} onPress={e => e.stopPropagation()}>
+          {/* Color banner */}
+          <View style={[dm.banner, { backgroundColor: event.color }]}>
+            <Pressable style={dm.closeBtn} onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={20} color="#fff" />
+            </Pressable>
+            <Text style={dm.subject}>{event.subject}</Text>
+            <Text style={dm.timeRange}>
+              {formatTimeDisplay(event.startTime)} – {formatTimeDisplay(event.endTime)}
+            </Text>
+          </View>
+
+          <ScrollView style={dm.body} showsVerticalScrollIndicator={false}>
+            {/* Date */}
+            <View style={dm.row}>
+              <Ionicons name="calendar-outline" size={18} color="#5F6368" />
+              <Text style={dm.rowText}>{dateStr}</Text>
+            </View>
+
+            {/* Professor */}
+            {event.professor ? (
+              <View style={dm.row}>
+                <Ionicons name="person-outline" size={18} color="#5F6368" />
+                <View>
+                  <Text style={dm.rowLabel}>Professor</Text>
+                  <Text style={dm.rowText}>{event.professor}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Classmates */}
+            {event.students.length > 0 && (
+              <View style={dm.row}>
+                <Ionicons name="people-outline" size={18} color="#5F6368" />
+                <View style={{ flex: 1 }}>
+                  <Text style={dm.rowLabel}>Classmates</Text>
+                  <View style={dm.chipRow}>
+                    {event.students.map(s => (
+                      <View key={s} style={dm.chip}>
+                        <Text style={dm.chipText}>{s}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Description */}
+            {event.description ? (
+              <View style={dm.row}>
+                <Ionicons name="document-text-outline" size={18} color="#5F6368" />
+                <View>
+                  <Text style={dm.rowLabel}>Description</Text>
+                  <Text style={dm.rowText}>{event.description}</Text>
+                </View>
+              </View>
+            ) : null}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────
+export default function StudentScheduleScreen() {
+  const scrollRef = useRef<ScrollView>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [currentStudent, setCurrentStudent] = useState('');
+  const [detailEvent, setDetailEvent] = useState<ScheduleEvent | null>(null);
+  const [allEvents, setAllEvents] = useState<ScheduleEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoadingEvents(true);
+      const data = await DataService.getScheduleEvents();
+      setAllEvents(data.map(e => ({
+        id: e.id,
+        subject: e.subject,
+        description: e.description || '',
+        date: e.date,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        professor: e.professor,
+        students: e.students,
+        color: e.color,
+      })));
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to load schedule' });
+    } finally {
+      setLoadingEvents(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+
+  // Extract unique student names from all events
+  const studentNames = useMemo(() => {
+    const names = new Set<string>();
+    allEvents.forEach(e => e.students.forEach(s => names.add(s)));
+    return Array.from(names).sort();
+  }, [allEvents]);
+
+  // Filter events for selected student (empty = all)
+  const studentEvents = useMemo(
+    () => currentStudent ? allEvents.filter(e => e.students.includes(currentStudent)) : allEvents,
+    [currentStudent, allEvents],
+  );
+
+  const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
+
+  const availableWidth = containerWidth > 0 ? containerWidth : 600;
+  const dayColW = viewMode === 'week'
+    ? Math.max((availableWidth - TIME_COL_WIDTH) / 7, 40)
+    : availableWidth - TIME_COL_WIDTH;
+
+  const visibleDates = useMemo(
+    () => (viewMode === 'week' ? weekDates : [currentDate]),
+    [viewMode, weekDates, currentDate],
+  );
+
+  const goToday = () => setCurrentDate(new Date());
+  const goPrev = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - (viewMode === 'week' ? 7 : 1));
+    setCurrentDate(d);
+  };
+  const goNext = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + (viewMode === 'week' ? 7 : 1));
+    setCurrentDate(d);
+  };
+
+  const headerTitle = useMemo(() => {
+    if (viewMode === 'day')
+      return `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getDate()}, ${currentDate.getFullYear()}`;
+    const first = weekDates[0], last = weekDates[6];
+    if (first.getMonth() === last.getMonth())
+      return `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`;
+    return `${MONTH_NAMES[first.getMonth()].slice(0, 3)} – ${MONTH_NAMES[last.getMonth()].slice(0, 3)} ${last.getFullYear()}`;
+  }, [viewMode, weekDates, currentDate]);
+
+  const eventsForDate = useCallback(
+    (dateStr: string) =>
+      studentEvents
+        .filter(e => e.date === dateStr)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    [studentEvents],
+  );
+
+  // Count events this week for the badge
+  const weekEventCount = useMemo(() => {
+    const weekKeys = new Set(weekDates.map(fmt));
+    return studentEvents.filter(e => weekKeys.has(e.date)).length;
+  }, [studentEvents, weekDates]);
+
+  const handleLayout = useCallback(
+    (e: any) => {
+      const w = e.nativeEvent.layout.width;
+      if (w > 0 && w !== containerWidth) setContainerWidth(w);
+    },
+    [containerWidth],
+  );
+
+  const initialScrollDone = useRef(false);
+  const handleScrollLayout = useCallback(() => {
+    if (!initialScrollDone.current) {
+      initialScrollDone.current = true;
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: (9 - START_HOUR) * HOUR_HEIGHT, animated: false });
+      }, 200);
+    }
+  }, []);
+
+  return (
+    <View style={st.container} onLayout={handleLayout}>
+      {/* Student Picker */}
+      <StudentPicker value={currentStudent} onSelect={setCurrentStudent} students={studentNames} />
+
+      {/* Week summary strip */}
+      <View style={st.summaryStrip}>
+        <Ionicons name="school-outline" size={16} color="#4285F4" />
+        <Text style={st.summaryText}>
+          {weekEventCount} class{weekEventCount !== 1 ? 'es' : ''} this week
+        </Text>
+      </View>
+
+      {/* Top Bar */}
+      <View style={st.topBar}>
+        <View style={st.topLeft}>
+          <Pressable style={st.todayBtn} onPress={goToday}>
+            <Text style={st.todayBtnText}>Today</Text>
+          </Pressable>
+          <View style={st.navArrows}>
+            <Pressable onPress={goPrev} hitSlop={8}>
+              <Ionicons name="chevron-back" size={22} color="#5F6368" />
+            </Pressable>
+            <Pressable onPress={goNext} hitSlop={8}>
+              <Ionicons name="chevron-forward" size={22} color="#5F6368" />
+            </Pressable>
+          </View>
+          <Text style={st.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+        </View>
+        <View style={st.topRight}>
+          <View style={st.viewToggle}>
+            <Pressable
+              style={[st.toggleBtn, viewMode === 'week' && st.toggleBtnOn]}
+              onPress={() => setViewMode('week')}
+            >
+              <Text style={[st.toggleText, viewMode === 'week' && st.toggleTextOn]}>Week</Text>
+            </Pressable>
+            <Pressable
+              style={[st.toggleBtn, viewMode === 'day' && st.toggleBtnOn]}
+              onPress={() => setViewMode('day')}
+            >
+              <Text style={[st.toggleText, viewMode === 'day' && st.toggleTextOn]}>Day</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      {/* Day Header */}
+      <View style={st.dayHeaderRow}>
+        <View style={{ width: TIME_COL_WIDTH }} />
+        {visibleDates.map(d => {
+          const today = isToday(d);
+          const dateStr = fmt(d);
+          const hasEvents = studentEvents.some(e => e.date === dateStr);
+          return (
+            <Pressable
+              key={dateStr}
+              style={[st.dayHeaderCell, { width: dayColW }]}
+              onPress={() => { setCurrentDate(d); setViewMode('day'); }}
+            >
+              <Text style={[st.dayName, today && st.dayNameToday]}>
+                {viewMode === 'day' ? DAY_NAMES_FULL[d.getDay()].toUpperCase() : DAY_NAMES[d.getDay()]}
+              </Text>
+              <View style={[st.dayNum, today && st.dayNumToday]}>
+                <Text style={[st.dayNumText, today && st.dayNumTextToday]}>{d.getDate()}</Text>
+              </View>
+              {hasEvents && !today && <View style={st.dayDot} />}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Scrollable Time Grid */}
+      {containerWidth > 0 && (
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          onLayout={handleScrollLayout}
+          showsVerticalScrollIndicator
+          scrollEventThrottle={16}
+        >
+          <View style={{ height: GRID_HEIGHT, flexDirection: 'row' }}>
+            {/* Time labels */}
+            <View style={{ width: TIME_COL_WIDTH }}>
+              {HOURS.map(h => (
+                <View key={h} style={{ height: HOUR_HEIGHT, justifyContent: 'flex-start', alignItems: 'flex-end', paddingRight: 8 }}>
+                  <Text style={st.timeLabel}>{formatHour(h)}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Day columns */}
+            {visibleDates.map(d => {
+              const dateStr = fmt(d);
+              const today = isToday(d);
+              const dayEvents = eventsForDate(dateStr);
+              const layoutMap = computeOverlapLayout(dayEvents);
+
+              return (
+                <View
+                  key={dateStr}
+                  style={{
+                    width: dayColW,
+                    height: GRID_HEIGHT,
+                    borderLeftWidth: 0.5,
+                    borderLeftColor: '#E5E7EB',
+                    backgroundColor: today ? '#EFF6FF' : 'transparent',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Hour grid lines */}
+                  {HOURS.map(h => (
+                    <View
+                      key={h}
+                      style={{ height: HOUR_HEIGHT, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }}
+                    />
+                  ))}
+
+                  {/* Event blocks (read-only, tap to view detail) */}
+                  {dayEvents.map(ev => {
+                    const topMin = timeToMin(ev.startTime) - START_HOUR * 60;
+                    const dur = timeToMin(ev.endTime) - timeToMin(ev.startTime);
+                    const top = (topMin / 60) * HOUR_HEIGHT;
+                    const h = (dur / 60) * HOUR_HEIGHT;
+                    const info = layoutMap.get(ev.id) || { col: 0, totalCols: 1 };
+                    const colW = (dayColW - 6) / info.totalCols;
+                    const left = 3 + info.col * colW;
+
+                    return (
+                      <Pressable
+                        key={ev.id}
+                        style={{
+                          position: 'absolute',
+                          top,
+                          left,
+                          width: colW - 3,
+                          height: Math.max(h, 28),
+                          backgroundColor: ev.color,
+                          borderRadius: 6,
+                          borderLeftWidth: 4,
+                          borderLeftColor: 'rgba(0,0,0,0.2)',
+                          paddingHorizontal: 8,
+                          paddingVertical: 5,
+                          overflow: 'hidden',
+                        }}
+                        onPress={() => setDetailEvent(ev)}
+                      >
+                        <Text style={st.evTitle} numberOfLines={1}>{ev.subject}</Text>
+                        {h > 34 && (
+                          <Text style={st.evTime} numberOfLines={1}>
+                            {formatTimeDisplay(ev.startTime)} – {formatTimeDisplay(ev.endTime)}
+                          </Text>
+                        )}
+                        {h > 56 && ev.professor ? (
+                          <Text style={st.evSub} numberOfLines={1}>{ev.professor}</Text>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      )}
+
+      {/* Event Detail Modal */}
+      <EventDetailModal
+        event={detailEvent}
+        visible={detailEvent !== null}
+        onClose={() => setDetailEvent(null)}
+      />
+    </View>
+  );
+}
+
+// ─── Student Picker Styles ───────────────────────────────────
+const sp = StyleSheet.create({
+  wrapper: { zIndex: 100, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  trigger: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 10,
   },
-  content: {
-    padding: 16,
-    paddingTop: 60,
+  name: { flex: 1, fontSize: 15, fontWeight: '600', color: '#3C4043' },
+  list: {
+    position: 'absolute', top: '100%', left: 12, right: 12,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB',
+    borderRadius: 10, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 8, elevation: 6,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+  item: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 11,
+    borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-    gap:12,
+  itemActive: { backgroundColor: '#EFF6FF' },
+  itemText: { fontSize: 14, color: '#3C4043' },
+  itemTextActive: { color: '#4285F4', fontWeight: '600' },
+});
+
+// ─── Detail Modal Styles ─────────────────────────────────────
+const dm = StyleSheet.create({
+  box: {
+    backgroundColor: '#fff', borderRadius: 16, width: '90%', maxWidth: 480,
+    maxHeight: '70%', overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15, shadowRadius: 24, elevation: 10,
   },
-   //  ADD THIS NEW STYLE
-  backButton: {
-    padding: 8,
+  banner: {
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 18,
   },
-  //  ADD THIS NEW STYLE
-  headerContent: {
-    flex: 1,
+  closeBtn: {
+    position: 'absolute', top: 12, right: 12,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
+  subject: { fontSize: 20, fontWeight: '700', color: '#fff', marginTop: 4 },
+  timeRange: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: 4 },
+  body: { padding: 20 },
+  row: {
+    flexDirection: 'row', gap: 12, alignItems: 'flex-start',
+    paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+  rowLabel: { fontSize: 11, fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  rowText: { fontSize: 14, color: '#3C4043', lineHeight: 20 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  chip: {
+    backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
   },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  chipText: { fontSize: 12, color: '#5F6368', fontWeight: '500' },
+});
+
+// ─── Main Styles ─────────────────────────────────────────────
+const st = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff' },
+
+  summaryStrip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 6,
+    backgroundColor: '#EFF6FF',
   },
-  createButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  summaryText: { fontSize: 13, color: '#4285F4', fontWeight: '500' },
+
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  searchContainer: {
-    marginBottom: 16,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 12,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#111827',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  scheduleList: {
-    gap: 16,
-  },
-  scheduleCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  scheduleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  scheduleHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  scheduleDepartment: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  statusBadgeActive: {
-    backgroundColor: '#D1FAE5',
-  },
-  statusBadgeDraft: {
-    backgroundColor: '#FEF3C7',
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  statusTextActive: {
-    color: '#059669',
-  },
-  statusTextDraft: {
-    color: '#D97706',
-  },
-  deleteButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  scheduleInfo: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  scheduleActions: {
-    flexDirection: 'row',
-    gap: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 16,
-  },
-  scheduleActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  scheduleActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-  scheduleActionTextSecondary: {
-    color: '#6B7280',
-  },
-  scheduleActionTextBlue: {
-    color: '#3B82F6',
-  },
+  topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 },
+  todayBtn: { borderWidth: 1, borderColor: '#DADCE0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 5 },
+  todayBtnText: { fontSize: 13, fontWeight: '600', color: '#3C4043' },
+  navArrows: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: '#3C4043', marginLeft: 4, flexShrink: 1 },
+
+  viewToggle: { flexDirection: 'row', borderWidth: 1, borderColor: '#DADCE0', borderRadius: 8, overflow: 'hidden' },
+  toggleBtn: { paddingHorizontal: 14, paddingVertical: 6, backgroundColor: '#fff' },
+  toggleBtnOn: { backgroundColor: '#4285F4' },
+  toggleText: { fontSize: 13, fontWeight: '600', color: '#5F6368' },
+  toggleTextOn: { color: '#fff' },
+
+  dayHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingBottom: 6, paddingTop: 8 },
+  dayHeaderCell: { alignItems: 'center' },
+  dayName: { fontSize: 11, fontWeight: '600', color: '#70757A', letterSpacing: 0.5 },
+  dayNameToday: { color: '#4285F4' },
+  dayNum: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  dayNumToday: { backgroundColor: '#4285F4' },
+  dayNumText: { fontSize: 18, fontWeight: '500', color: '#3C4043' },
+  dayNumTextToday: { color: '#fff', fontWeight: '600' },
+  dayDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#4285F4', marginTop: 3 },
+
+  timeLabel: { fontSize: 10, color: '#70757A', marginTop: -7 },
+
+  evTitle: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  evTime: { fontSize: 10, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
+  evSub: { fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
 });

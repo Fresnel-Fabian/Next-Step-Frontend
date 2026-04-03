@@ -41,9 +41,9 @@ interface AuthStore {
   error: ApiError | null;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (
-    idToken: string,
-    googleUser?: any,
-    accessToken?: string,
+    code: string,
+    codeVerifier: string,
+    redirectUri: string,
   ) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -94,11 +94,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  loginWithGoogle: async (idToken: string) => {
+  loginWithGoogle: async (code: string, codeVerifier: string, redirectUri: string) => {
     set({ isLoading: true, error: null });
     try {
       const response = await api.post<AuthResponse>('/api/v1/auth/google', {
-        idToken,
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: redirectUri,
       });
       const { token, user } = response.data;
       await setAuthToken(token);

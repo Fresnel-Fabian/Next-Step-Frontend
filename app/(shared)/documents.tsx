@@ -1,7 +1,6 @@
 import { DocumentListItem } from '@/components/documents/DocumentListItem';
 import { DataService, DocumentItem } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -17,7 +16,6 @@ import Toast from 'react-native-toast-message';
 
 export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(0);
@@ -80,6 +78,10 @@ export default function DocumentsScreen() {
     });
   };
 
+  const filteredDocuments = documents.filter((doc) =>
+    doc.title.toLowerCase().includes(search.toLowerCase()),
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -93,9 +95,6 @@ export default function DocumentsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#111827" />
-          </Pressable>
           <View style={styles.headerContent}>
             <Text style={styles.title}>Document Center</Text>
             <Text style={styles.subtitle}>Access and manage important documents</Text>
@@ -256,9 +255,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  backButton: {
-    padding: 8,
-  },
   headerContent: {
     flex: 1,
   },
@@ -320,8 +316,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  searchIcon: {
-    marginRight: 8,
+  modalSizeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   searchInput: {
     flex: 1,

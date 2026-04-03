@@ -9,9 +9,9 @@ export default function Index() {
   }
 
   if (user) {
-    return user.role === 'ADMIN'
-      ? <Redirect href="/(admin)/dashboard" />
-      : <Redirect href="/(staff)/dashboard" />;
+    if (user.role === 'ADMIN') return <Redirect href="/(admin)/dashboard" />;
+    if (user.role === 'TEACHER') return <Redirect href="/(staff)/dashboard" />;
+    return <Redirect href="/(student)/dashboard" />;
   }
 
   return <Redirect href="/(auth)/login" />;

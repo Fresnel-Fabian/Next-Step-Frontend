@@ -10,8 +10,12 @@
 import { GoogleAuthConfig } from "@/config/google-auth";
 import { useAuthStore } from "@/store/authStore";
 import { Ionicons } from "@expo/vector-icons";
-import { ResponseType } from "expo-auth-session";
-import * as Google from "expo-auth-session/providers/google";
+import {
+  makeRedirectUri,
+  ResponseType,
+  useAuthRequest,
+  useAutoDiscovery,
+} from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -27,12 +31,8 @@ import {
   View
 } from 'react-native';
 
-// This is required for the auth session to work
+// Required for the auth session to work
 WebBrowser.maybeCompleteAuthSession();
-
-// Google's OIDC discovery document: expo-auth-session reads authorization
-// and token endpoints from here automatically.
-const GOOGLE_DISCOVERY_URL = "https://accounts.google.com";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -44,23 +44,15 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Google Sign-In setup
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: GoogleAuthConfig.webClientId,
-    iosClientId: GoogleAuthConfig.iosClientId,
-    androidClientId: GoogleAuthConfig.androidClientId,
-    scopes: ["openid", "email", "profile"], // IdToken flow only allows a subset of [openid, email, profile]
-    responseType: ResponseType.IdToken,
-  });
+  // Google PKCE auth setup
+  const discovery = useAutoDiscovery("https://accounts.google.com");
+  const redirectUri = makeRedirectUri();
 
   // Handle Google auth response
   useEffect(() => {
     if (response?.type === "success") {
-      const { authentication, params } = response as any;
-      const idToken = params?.id_token ?? authentication?.idToken;
-      const accessToken = params?.access_token ?? authentication?.accessToken;
-
-      handleGoogleSuccess(idToken, accessToken);
+      const { code } = response.params;
+      handleGoogleSuccess(code);
     } else if (response?.type === "error") {
       setError("Google sign-in failed. Please try again.");
       setIsLoading(false);
@@ -69,33 +61,15 @@ export default function LoginScreen() {
     }
   }, [response]);
 
-  const handleGoogleSuccess = async (
-    idToken?: string,
-    accessToken?: string,
-  ) => {
-    const tokenToSend = idToken || accessToken;
-
-    if (!tokenToSend) {
-      setError("Failed to get authentication token");
+  const handleGoogleSuccess = async (code: string) => {
+    if (!code || !request?.codeVerifier) {
+      setError("Failed to get authorization code");
       setIsLoading(false);
       return;
     }
 
     try {
-      // Fetch user info from Google
-      const userInfoResponse = await fetch(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        },
-      );
-      const userData = await userInfoResponse.json();
-      
-      // Login with Google user data
-      // await loginWithGoogle(idToken, userData);
-      await loginWithGoogle(idToken);
-
-      
+      await loginWithGoogle(code, request.codeVerifier, redirectUri);
       // Navigation happens automatically via root layout
     } catch (err) {
       console.error("Google auth error:", err);

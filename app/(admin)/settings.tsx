@@ -1,2 +1,1 @@
-// app/(admin)/settings.tsx
-export { default } from '@/app/(shared)/settings';
+export { default } from '../(shared)/settings';
