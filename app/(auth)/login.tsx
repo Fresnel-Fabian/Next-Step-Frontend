@@ -48,18 +48,7 @@ export default function LoginScreen() {
   const discovery = useAutoDiscovery("https://accounts.google.com");
   const redirectUri = makeRedirectUri();
 
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId: GoogleAuthConfig.webClientId,
-      scopes: GoogleAuthConfig.scopes,
-      redirectUri,
-      responseType: ResponseType.Code,
-      usePKCE: true,
-    },
-    discovery,
-  );
-
-  // Handle Google auth response — send code + PKCE verifier to backend
+  // Handle Google auth response
   useEffect(() => {
     if (response?.type === "success") {
       const { code } = response.params;

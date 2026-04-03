@@ -110,6 +110,14 @@ const handleClearAll = async () => {
           <Text style={styles.greeting}>Admin Dashboard</Text>
           <Text style={styles.subGreeting}>Welcome back, {user?.name || 'Administrator'}</Text>
         </View>
+        <View style={styles.headerActions}>
+          <Pressable onPress={handleRefresh} style={styles.refreshButton}>
+            <Ionicons name="refresh-outline" size={24} color="#6B7280" />
+          </Pressable>
+          <Pressable onPress={handleLogout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={24} color="#6B7280" />
+          </Pressable>
+        </View>
       </View>
 
       {/* Stats Grid */}

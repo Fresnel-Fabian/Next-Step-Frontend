@@ -127,31 +127,82 @@ export default function AdminLayout() {
   );
 
   return (
-    <View style={styles.container}>
-      {/* Mobile hamburger */}
-      {isMobile && !mobileOpen && (
-        <Pressable style={styles.hamburger} onPress={() => setMobileOpen(true)}>
-          <Ionicons name="menu" size={24} color="#374151" />
-        </Pressable>
-      )}
-
-      {/* Mobile overlay */}
-      {isMobile && mobileOpen && (
-        <Pressable style={styles.overlay} onPress={() => setMobileOpen(false)}>
-          <Pressable onPress={e => e.stopPropagation()}>
-            <SidebarContent />
-          </Pressable>
-        </Pressable>
-      )}
-
-      {/* Desktop sidebar */}
-      {!isMobile && <SidebarContent />}
-
-      {/* Main content */}
-      <View style={[styles.main, !isMobile && { marginLeft: sidebarWidth }]}>
-        <Slot />
-      </View>
-    </View>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#2563EB',
+        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="grid-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="polls"
+        options={{
+          title: 'Polls',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="announcements"
+        options={{
+          title: 'Announce',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="megaphone-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="schedules"
+        options={{
+          title: 'Schedules',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="documents"
+        options={{
+          title: 'Documents',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="document-text-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notification"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
 
