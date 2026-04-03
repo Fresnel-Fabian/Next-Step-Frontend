@@ -4,7 +4,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Linking,
     Modal,
     Pressable,
@@ -270,25 +269,22 @@ export default function AdminAnnouncements() {
   };
 
   const handleDelete = (id: number) => {
-    Alert.alert(
-      'Delete Announcement',
-      'Delete this announcement? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            DataService.deleteAnnouncement(id)
-              .then(() => {
-                Toast.show({ type: 'success', text1: 'Announcement deleted' });
-                fetchAnnouncements();
-              })
-              .catch(() => Toast.show({ type: 'error', text1: 'Failed to delete' }));
-          },
-        },
-      ],
-    );
+    setDeleteTarget(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteTarget === null) return;
+    try {
+      setDeleting(true);
+      await DataService.deleteAnnouncement(deleteTarget);
+      Toast.show({ type: 'success', text1: 'Announcement deleted' });
+      setDeleteTarget(null);
+      fetchAnnouncements();
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to delete announcement' });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (

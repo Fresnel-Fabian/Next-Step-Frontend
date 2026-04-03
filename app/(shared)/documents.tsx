@@ -3,31 +3,29 @@ import { DataService, DocumentItem } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
-export default function DocumentsScreen() {
+
+export default function AdminDocuments() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(0);
+  const [search, setSearch] = useState('');
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
 
-  const categories = ['All Documents', 'Policies', 'Forms', 'Handbooks', 'Resources'];
-
   useEffect(() => {
-    fetchDocuments();
+    loadDocuments();
   }, []);
 
-  const fetchDocuments = async () => {
+  const loadDocuments = async () => {
     try {
       setLoading(true);
       const data = await DataService.getDocuments();
@@ -53,9 +51,9 @@ export default function DocumentsScreen() {
     }
   };
 
-  const filteredDocuments = documents.filter(doc =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handlePreview = (doc: DocumentItem) => {
+    setPreviewDoc(doc);
+  };
 
   const handleDownload = (doc: DocumentItem) => {
     console.log('Download:', doc.title);
@@ -102,34 +100,7 @@ export default function DocumentsScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Categories */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesScroll}
-          contentContainerStyle={styles.categoriesContent}
-        >
-          {categories.map((cat, idx) => (
-            <Pressable
-              key={cat}
-              style={[
-                styles.categoryButton,
-                selectedCategory === idx && styles.categoryButtonActive
-              ]}
-              onPress={() => setSelectedCategory(idx)}
-            >
-              {selectedCategory === idx && <View style={styles.categoryDot} />}
-              <Text style={[
-                styles.categoryText,
-                selectedCategory === idx && styles.categoryTextActive
-              ]}>
-                {cat}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
+      <ScrollView contentContainerStyle={styles.listContent}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
@@ -137,21 +108,31 @@ export default function DocumentsScreen() {
             style={styles.searchInput}
             placeholder="Search documents..."
             placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+            value={search}
+            onChangeText={setSearch}
           />
         </View>
 
         {/* Document List */}
         <View style={styles.documentList}>
-          {filteredDocuments.map((doc) => (
-            <DocumentListItem
-              key={doc.id}
-              document={doc}
-              onPreview={() => setPreviewDoc(doc)}
-              onDownload={() => handleDownload(doc)}
-            />
-          ))}
+          {filteredDocuments.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No documents found</Text>
+              <Text style={styles.emptySubtitle}>
+                {search ? 'Try a different search term' : 'Documents will appear here'}
+              </Text>
+            </View>
+          ) : (
+            filteredDocuments.map((doc) => (
+              <DocumentListItem
+                key={doc.id}
+                document={doc}
+                onPreview={() => handlePreview(doc)}
+                onDownload={() => handleDownload(doc)}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -232,6 +213,7 @@ export default function DocumentsScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -268,59 +250,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
-  content: {
-    flex: 1,
-  },
-  categoriesScroll: {
-    maxHeight: 50,
-    marginTop: 16,
-  },
-  categoriesContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: 'white',
-    gap: 8,
-  },
-  categoryButtonActive: {
-    backgroundColor: '#EFF6FF',
-  },
-  categoryDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#2563EB',
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  categoryTextActive: {
-    color: '#2563EB',
+  listContent: {
+    padding: 16,
+    paddingBottom: 32,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    height: 44,
   },
-  modalSizeBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
@@ -329,7 +275,23 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   documentList: {
-    padding: 16,
+    gap: 0,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   modalContainer: {
     flex: 1,
@@ -351,115 +313,103 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 16,
   },
+  modalHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   closeButton: {
     padding: 4,
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: 'white',
     flex: 1,
   },
   modalSizeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#374151',
+    borderRadius: 8,
   },
   modalSizeText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  modalHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+    fontSize: 11,
+    color: 'white',
+    fontWeight: '500',
   },
   modalIconButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   modalOpenButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
     backgroundColor: '#2563EB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
   },
   modalOpenButtonText: {
-    color: 'white',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
+    color: 'white',
   },
   modalContent: {
     flex: 1,
   },
   modalContentInner: {
-    padding: 32,
-    alignItems: 'center',
+    padding: 24,
   },
   previewDocument: {
     backgroundColor: 'white',
-    width: '100%',
-    maxWidth: 600,
-    padding: 48,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 12,
+    padding: 24,
+    gap: 16,
   },
   previewTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
   },
   previewCategory: {
     fontSize: 14,
     color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: 32,
   },
   previewTOC: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 32,
-    marginVertical: 32,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    gap: 12,
   },
   previewTOCTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
   },
   previewTOCList: {
-    gap: 16,
+    gap: 8,
   },
   previewTOCItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   previewTOCText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: '#4B5563',
   },
   previewTOCPage: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   previewNote: {
-    backgroundColor: '#EFF6FF',
-    padding: 16,
+    backgroundColor: '#FEF3C7',
     borderRadius: 8,
+    padding: 12,
   },
   previewNoteText: {
-    fontSize: 14,
-    color: '#1E40AF',
-    textAlign: 'center',
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 18,
   },
 });
