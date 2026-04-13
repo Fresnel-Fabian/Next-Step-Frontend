@@ -1,6 +1,7 @@
 import { ActivityItem } from '@/components/dashboard/ActivityItem';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ActivityLog, DashboardStats, DataService } from '@/services/dataService';
+import { useDashboardCompact } from '@/lib/dashboardResponsive';
 import { useAuthStore } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -15,7 +16,16 @@ import {
 import Toast from 'react-native-toast-message';
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const {
+    isCompact,
+    contentPaddingX,
+    contentPaddingY,
+    greetingFontSize,
+    secondaryFontSize,
+    cardPadding,
+    sectionGap,
+  } = useDashboardCompact();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,28 +64,23 @@ export default function AdminDashboard() {
     }
   };
 
-  // Dismiss a single activity item from the feed
- const handleDismissActivity = async (id: string) => {
-  try {
-    await DataService.deleteActivity(id);
-    setActivities(prev => prev.filter(a => a.id !== id));
-  } catch {
-    Toast.show({ type: 'error', text1: 'Failed to delete activity' });
-  }
-};
+  const handleDismissActivity = async (id: string) => {
+    try {
+      await DataService.deleteActivity(id);
+      setActivities(prev => prev.filter(a => a.id !== id));
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to delete activity' });
+    }
+  };
 
-const handleClearAll = async () => {
-  try {
-    await DataService.deleteAllActivity();
-    setActivities([]);
-    Toast.show({ type: 'success', text1: 'Activity cleared', position: 'top', visibilityTime: 1500 });
-  } catch {
-    Toast.show({ type: 'error', text1: 'Failed to clear activity' });
-  }
-};
-  const handleLogout = () => {
-    Toast.show({ type: 'info', text1: 'Logging Out', text2: 'See you soon!', position: 'top', visibilityTime: 2000 });
-    setTimeout(() => logout(), 500);
+  const handleClearAll = async () => {
+    try {
+      await DataService.deleteAllActivity();
+      setActivities([]);
+      Toast.show({ type: 'success', text1: 'Activity cleared', position: 'top', visibilityTime: 1500 });
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to clear activity' });
+    }
   };
 
   const handleRefresh = () => {
@@ -102,44 +107,107 @@ const handleClearAll = async () => {
     );
   }
 
+  const statNodes = (
+    <>
+      <StatsCard
+        title="Active Schedules"
+        value={stats.activeSchedules}
+        subtitle={stats.schedulesTrend}
+        icon="calendar-outline"
+        color="#10B981"
+        compact={isCompact}
+      />
+      <StatsCard
+        title="Notifications Sent"
+        value={stats.notificationsSent}
+        subtitle={stats.notificationsTrend}
+        icon="notifications-outline"
+        color="#8B5CF6"
+        compact={isCompact}
+      />
+      <StatsCard
+        title="Documents"
+        value={stats.totalDocuments}
+        subtitle={stats.documentsTrend}
+        icon="document-text-outline"
+        color="#F59E0B"
+        compact={isCompact}
+      />
+    </>
+  );
+
+  const contentPad = {
+    paddingHorizontal: contentPaddingX,
+    paddingVertical: contentPaddingY,
+    paddingBottom: contentPaddingY + 8,
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Admin Dashboard</Text>
-          <Text style={styles.subGreeting}>Welcome back, {user?.name || 'Administrator'}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={contentPad}>
+      <View style={[styles.header, { marginBottom: sectionGap }]}>
+        <View style={isCompact ? styles.headerTextBlock : undefined}>
+          <Text style={[styles.greeting, { fontSize: greetingFontSize }]}>Admin Dashboard</Text>
+          <Text style={[styles.subGreeting, { fontSize: secondaryFontSize }]}>
+            Welcome back, {user?.name || 'Administrator'}
+          </Text>
         </View>
       </View>
 
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statRow}>
-          <View style={styles.statHalf}>
-            <StatsCard title="Total Staff" value={stats.totalStaff} subtitle={stats.staffTrend} icon="people-outline" color="#3B82F6" />
-          </View>
-          <View style={styles.statHalf}>
-            <StatsCard title="Active Schedules" value={stats.activeSchedules} subtitle={stats.schedulesTrend} icon="calendar-outline" color="#10B981" />
-          </View>
-        </View>
-        <View style={styles.statRow}>
-          <View style={styles.statHalf}>
-            <StatsCard title="Notifications Sent" value={stats.notificationsSent} subtitle={stats.notificationsTrend} icon="notifications-outline" color="#8B5CF6" />
-          </View>
-          <View style={styles.statHalf}>
-            <StatsCard title="Documents" value={stats.totalDocuments} subtitle={stats.documentsTrend} icon="document-text-outline" color="#F59E0B" />
-          </View>
-        </View>
+      <View style={[styles.statsGrid, { marginBottom: sectionGap }]}>
+        {isCompact ? (
+          <View style={styles.statsStack}>{statNodes}</View>
+        ) : (
+          <>
+            <View style={styles.statRow}>
+              <View style={styles.statHalf}>
+                <StatsCard
+                  title="Total Staff"
+                  value={stats.totalStaff}
+                  subtitle={stats.staffTrend}
+                  icon="people-outline"
+                  color="#3B82F6"
+                />
+              </View>
+              <View style={styles.statHalf}>
+                <StatsCard
+                  title="Active Schedules"
+                  value={stats.activeSchedules}
+                  subtitle={stats.schedulesTrend}
+                  icon="calendar-outline"
+                  color="#10B981"
+                />
+              </View>
+            </View>
+            <View style={styles.statRow}>
+              <View style={styles.statHalf}>
+                <StatsCard
+                  title="Notifications Sent"
+                  value={stats.notificationsSent}
+                  subtitle={stats.notificationsTrend}
+                  icon="notifications-outline"
+                  color="#8B5CF6"
+                />
+              </View>
+              <View style={styles.statHalf}>
+                <StatsCard
+                  title="Documents"
+                  value={stats.totalDocuments}
+                  subtitle={stats.documentsTrend}
+                  icon="document-text-outline"
+                  color="#F59E0B"
+                />
+              </View>
+            </View>
+          </>
+        )}
       </View>
 
-      {/* Main Content Area */}
-      <View style={styles.mainContent}>
-        <View style={styles.leftColumn}>
-          {/* Documents Card */}
-          <Pressable style={styles.actionCard}>
+      <View style={[styles.mainContent, { gap: isCompact ? 16 : 20 }]}>
+        <View style={[styles.leftColumn, { gap: isCompact ? 16 : 20 }]}>
+          <Pressable style={[styles.actionCard, { padding: cardPadding }]}>
             <View style={styles.actionHeader}>
               <View style={[styles.actionIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="document-text" size={24} color="#10B981" />
+                <Ionicons name="document-text" size={isCompact ? 22 : 24} color="#10B981" />
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Documents</Text>
@@ -149,12 +217,11 @@ const handleClearAll = async () => {
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </Pressable>
 
-          {/* Analytics Card */}
-          <View style={styles.analyticsCard}>
+          <View style={[styles.analyticsCard, { padding: cardPadding }]}>
             <View style={styles.analyticsHeader}>
               <View style={styles.actionHeader}>
                 <View style={[styles.actionIcon, { backgroundColor: '#FED7AA' }]}>
-                  <Ionicons name="bar-chart" size={24} color="#F59E0B" />
+                  <Ionicons name="bar-chart" size={isCompact ? 22 : 24} color="#F59E0B" />
                 </View>
                 <View style={styles.actionText}>
                   <Text style={styles.actionTitle}>Analytics</Text>
@@ -163,24 +230,21 @@ const handleClearAll = async () => {
               </View>
             </View>
 
-            {/* Chart - with safe guard */}
             {stats.chartData && stats.chartData.length > 0 ? (
-              <View style={styles.chartContainer}>
+              <View style={[styles.chartContainer, isCompact && styles.chartContainerCompact]}>
                 <Text style={{ color: '#9CA3AF' }}>Chart loaded</Text>
               </View>
             ) : (
-              <View style={styles.chartContainer}>
+              <View style={[styles.chartContainer, isCompact && styles.chartContainerCompact]}>
                 <Text style={{ color: '#9CA3AF', marginTop: 40 }}>No chart data available</Text>
               </View>
             )}
           </View>
         </View>
 
-        {/* Recent Activity */}
-        <View style={styles.activityCard}>
+        <View style={[styles.activityCard, { padding: cardPadding }]}>
           <View style={styles.activityHeader}>
             <Text style={styles.activityTitle}>Recent Activity</Text>
-            {/* ✅ Clear all button */}
             {activities.length > 0 && (
               <Pressable onPress={handleClearAll}>
                 <Text style={styles.clearAllButton}>Clear All</Text>
@@ -196,7 +260,6 @@ const handleClearAll = async () => {
           ) : (
             <View style={styles.activityList}>
               {activities.map((activity) => (
-                // ✅ Wrap each item with dismiss button
                 <View key={activity.id} style={styles.activityRow}>
                   <View style={styles.activityItemContainer}>
                     <ActivityItem
@@ -216,7 +279,6 @@ const handleClearAll = async () => {
             </View>
           )}
         </View>
-
       </View>
     </ScrollView>
   );
@@ -227,9 +289,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  content: {
-    padding: 24,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -239,21 +298,23 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 28,
+    alignItems: 'flex-start',
+  },
+  headerTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   greeting: {
-    fontSize: 26,
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 6,
   },
   subGreeting: {
-    fontSize: 14,
     color: '#6B7280',
   },
-  statsGrid: {
-    marginBottom: 28,
+  statsGrid: {},
+  statsStack: {
+    gap: 12,
   },
   statRow: {
     flexDirection: 'row',
@@ -263,6 +324,10 @@ const styles = StyleSheet.create({
   statHalf: {
     flex: 1,
   },
+  statFull: {
+    flex: 1,
+    width: '100%',
+  },
   mainContent: {
     gap: 20,
   },
@@ -271,7 +336,6 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     backgroundColor: 'white',
-    padding: 24,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#F3F4F6',
@@ -288,6 +352,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+    flex: 1,
+    minWidth: 0,
   },
   actionIcon: {
     width: 48,
@@ -298,6 +364,8 @@ const styles = StyleSheet.create({
   },
   actionText: {
     gap: 2,
+    flex: 1,
+    minWidth: 0,
   },
   actionTitle: {
     fontSize: 16,
@@ -310,7 +378,6 @@ const styles = StyleSheet.create({
   },
   analyticsCard: {
     backgroundColor: 'white',
-    padding: 24,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#F3F4F6',
@@ -329,9 +396,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chartContainerCompact: {
+    height: 140,
+    marginTop: 4,
+  },
   activityCard: {
     backgroundColor: 'white',
-    padding: 24,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#F3F4F6',
@@ -352,16 +422,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#111827',
   },
-  viewAllButton: {
-    fontSize: 12,
-    color: '#2563EB',
-    fontWeight: '600',
-  },
   activityList: {
     gap: 0,
   },
   clearAllButton: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
-  // ✅ New styles for dismiss
   activityRow: { flexDirection: 'row', alignItems: 'center' },
   activityItemContainer: { flex: 1 },
   dismissBtn: { padding: 8 },

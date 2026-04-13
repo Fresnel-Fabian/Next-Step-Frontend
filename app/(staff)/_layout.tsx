@@ -30,6 +30,13 @@ const NAV_ITEMS: RoleNavItem[] = [
     route: '/(staff)/documents',
   },
   {
+    segment: 'announcements',
+    label: 'Announcements',
+    tabShort: 'News',
+    icon: 'megaphone-outline',
+    route: '/(staff)/announcements',
+  },
+  {
     segment: 'notification',
     label: 'Notifications',
     tabShort: 'Alerts',

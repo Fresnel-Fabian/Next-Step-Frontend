@@ -121,7 +121,10 @@ export interface UpdateScheduleEventData {
 
 export interface PollOption {
   id: number;
+  /** Full option label shown in UI (prefer over short codes) */
   text: string;
+  /** Optional short code from API; display uses `text` when set */
+  label?: string;
   votes: number;
   percentage: number;
 }
@@ -218,6 +221,31 @@ const formatRelativeTime = (dateString: string): string => {
   if (diffHours < 24) return `${diffHours} hours ago`;
   if (diffDays < 7) return `${diffDays} days ago`;
   return date.toLocaleDateString();
+};
+
+/** e.g. "Apr 10" — used for poll end / ended copy */
+const formatPollMonthDay = (dateString: string): string =>
+  new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+/** Subtitle for list cards: "Ends …" / "Ended …" / "Open-ended" / created date (never duplicate "Closed" with badge) */
+const buildPollScheduleLabel = (poll: {
+  expiresAt?: string;
+  isActive: boolean;
+  createdAt?: string;
+}): string => {
+  if (poll.expiresAt) {
+    const end = new Date(poll.expiresAt);
+    const now = new Date();
+    if (poll.isActive && end > now) {
+      return `Ends ${formatPollMonthDay(poll.expiresAt)}`;
+    }
+    return `Ended ${formatPollMonthDay(poll.expiresAt)}`;
+  }
+  if (poll.isActive) return "Open-ended";
+  if (poll.createdAt) {
+    return `Created ${formatPollMonthDay(poll.createdAt)}`;
+  }
+  return "";
 };
 
 const formatFileSize = (bytes: number): string => {
@@ -536,6 +564,15 @@ static async deleteAllActivity(): Promise<void> {
   // Polls
   // ========================================
 
+  /** API routes expect numeric poll IDs; coerce from API/legacy string ids */
+  private static toPollId(pollId: number | string): number {
+    const n = typeof pollId === "string" ? Number.parseInt(pollId, 10) : pollId;
+    if (Number.isNaN(n)) {
+      throw new Error("Invalid poll id");
+    }
+    return n;
+  }
+
   static async getPolls(status?: "active" | "completed"): Promise<Poll[]> {
     try {
       const response = await api.get<Poll[]>("/api/v1/polls", {
@@ -543,23 +580,25 @@ static async deleteAllActivity(): Promise<void> {
       });
       return response.data.map((poll) => ({
         ...poll,
-        id: String(poll.id),
+        id: Number(poll.id),
         question: poll.title,
         status: poll.isActive ? 'active' : 'completed',
-        timeLeft: poll.expiresAt
-          ? (new Date(poll.expiresAt) > new Date()
-            ? `Ends ${formatRelativeTime(poll.expiresAt).replace(' ago', '')}`
-            : `Ended ${formatRelativeTime(poll.expiresAt)}`)
-          : (poll.isActive ? 'No expiry' : 'Ended'),
+        timeLeft: buildPollScheduleLabel(poll),
         creator: 'Administrator',
         voted: false,
-        options: (poll.options || []).map((o: any) => ({
-          id: o.id,
-          text: o.text || o.label || '',
-          label: o.text || o.label || '',
-          votes: o.votes,
-          percentage: o.percentage,
-        })),
+        options: (poll.options || []).map((o: any) => {
+          const rawText = o.text != null ? String(o.text).trim() : "";
+          const rawLabel = o.label != null ? String(o.label).trim() : "";
+          const display =
+            rawText.length >= rawLabel.length ? rawText || rawLabel : rawLabel || rawText;
+          return {
+            id: o.id,
+            text: display,
+            label: rawLabel || undefined,
+            votes: o.votes,
+            percentage: o.percentage,
+          };
+        }),
       }));
     } catch (error) {
       throw handleApiError(error);
@@ -583,33 +622,37 @@ static async deleteAllActivity(): Promise<void> {
     }
   }
 
-  static async votePoll(pollId: number, optionId: number): Promise<void> {
+  static async votePoll(pollId: number | string, optionId: number): Promise<void> {
     try {
-      await api.post(`/api/v1/polls/${pollId}/vote`, { option_id: optionId });
+      const id = DataService.toPollId(pollId);
+      await api.post(`/api/v1/polls/${id}/vote`, { option_id: optionId });
     } catch (error) {
       throw handleApiError(error);
     }
   }
 
-  static async closePoll(pollId: number): Promise<void> {
+  static async closePoll(pollId: number | string): Promise<void> {
     try {
-      await api.patch(`/api/v1/polls/${pollId}/close`);
+      const id = DataService.toPollId(pollId);
+      await api.patch(`/api/v1/polls/${id}/close`);
     } catch (error) {
       throw handleApiError(error);
     }
   }
 
-  static async deletePoll(pollId: number): Promise<void> {
+  static async deletePoll(pollId: number | string): Promise<void> {
     try {
-      await api.delete(`/api/v1/polls/${pollId}`);
+      const id = DataService.toPollId(pollId);
+      await api.delete(`/api/v1/polls/${id}`);
     } catch (error) {
       throw handleApiError(error);
     }
   }
 
-  static async getPollResults(pollId: number): Promise<PollResults> {
+  static async getPollResults(pollId: number | string): Promise<PollResults> {
     try {
-      const response = await api.get<PollResults>(`/api/v1/polls/${pollId}/results`);
+      const id = DataService.toPollId(pollId);
+      const response = await api.get<PollResults>(`/api/v1/polls/${id}/results`);
       return {
         ...response.data,
         voters: response.data.voters.map(v => ({

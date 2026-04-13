@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -26,6 +27,48 @@ export interface RoleNavItem {
 const MOBILE_BREAKPOINT = 768;
 const SIDEBAR_WIDTH = 240;
 const SIDEBAR_COLLAPSED = 68;
+
+/** Frosted glass overlay (used on top of BlurView) */
+const GLASS_TINT = 'rgba(255, 255, 255, 0.48)';
+const GLASS_EDGE_TOP = 'rgba(255, 255, 255, 0.65)';
+const GLASS_EDGE_BOTTOM = 'rgba(15, 23, 42, 0.08)';
+
+function GlassUnderlay() {
+  return (
+    <>
+      <BlurView intensity={72} tint="light" style={StyleSheet.absoluteFillObject} />
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: GLASS_TINT }]}
+      />
+    </>
+  );
+}
+
+function MobileGlassTopBar({
+  paddingTop,
+  children,
+}: {
+  paddingTop: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.mobileTopGlassOuter}>
+      <GlassUnderlay />
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: GLASS_EDGE_BOTTOM,
+          },
+        ]}
+      />
+      <View style={[styles.mobileTopGlassInner, { paddingTop }]}>{children}</View>
+    </View>
+  );
+}
 
 type RoleTabsShellProps = {
   navItems: RoleNavItem[];
@@ -129,6 +172,7 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
 
   const notificationItem = navItems.find(i => i.segment === 'notification');
   const settingsItem = navItems.find(i => i.segment === 'settings');
+  const dashboardItem = navItems.find(i => i.segment === 'dashboard');
   const visibleTabCount = navItems.filter(
     i => i.segment !== 'notification' && i.segment !== 'settings',
   ).length;
@@ -148,7 +192,22 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
         ]}
       >
         {isMobile && notificationItem && settingsItem && (
-          <View style={[styles.mobileTopBar, { paddingTop: insets.top + 6 }]}>
+          <MobileGlassTopBar paddingTop={insets.top + 6}>
+            {dashboardItem && (
+              <Pressable
+                onPress={() => navigate(dashboardItem.route)}
+                style={styles.mobileLogoCluster}
+                accessibilityRole="button"
+                accessibilityLabel="Next Step, go to home"
+              >
+                <View style={styles.brandIcon}>
+                  <Ionicons name="school" size={22} color="#fff" />
+                </View>
+                <Text style={styles.mobileBrandText} numberOfLines={1}>
+                  Next Step
+                </Text>
+              </Pressable>
+            )}
             <View style={styles.mobileTopBarSpacer} />
             <Pressable
               onPress={() => navigate(notificationItem.route)}
@@ -174,7 +233,7 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
                 color={settingsActive ? '#2563EB' : '#374151'}
               />
             </Pressable>
-          </View>
+          </MobileGlassTopBar>
         )}
 
         <View style={styles.tabsFlex}>
@@ -196,9 +255,10 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
                     paddingBottom: tabBarBottomPad,
                     paddingHorizontal: 2,
                     minHeight: 52 + tabBarBottomPad,
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: 'transparent',
                     borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: '#E5E7EB',
+                    borderTopColor: GLASS_EDGE_TOP,
+                    elevation: 0,
                   }
                 : {
                     height: 0,
@@ -206,6 +266,27 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
                     opacity: 0,
                     overflow: 'hidden',
                   },
+              tabBarBackground: isMobile
+                ? () => (
+                    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                      <BlurView
+                        intensity={76}
+                        tint="light"
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <View
+                        style={[
+                          StyleSheet.absoluteFillObject,
+                          {
+                            backgroundColor: GLASS_TINT,
+                            borderTopWidth: StyleSheet.hairlineWidth,
+                            borderTopColor: GLASS_EDGE_TOP,
+                          },
+                        ]}
+                      />
+                    </View>
+                  )
+                : undefined,
               tabBarItemStyle: {
                 paddingVertical: 4,
                 minHeight: 48,
@@ -257,15 +338,16 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
   },
-  mobileTopBar: {
+  mobileTopGlassOuter: {
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  mobileTopGlassInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     paddingHorizontal: 8,
     paddingBottom: 8,
-    backgroundColor: '#F9FAFB',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
     gap: 4,
   },
   mobileTopBarSpacer: {
@@ -277,6 +359,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
+  },
+  mobileLogoCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+    paddingRight: 8,
+    maxWidth: 170,
+    flexShrink: 0,
+  },
+  mobileBrandText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+    flexShrink: 1,
   },
   sidebar: {
     backgroundColor: '#fff',
