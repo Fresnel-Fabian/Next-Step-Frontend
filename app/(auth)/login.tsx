@@ -131,10 +131,10 @@ export default function LoginScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header with Logo */}
+        {/* Header — app mark (icon only, matches dashboard shell) */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="book" size={32} color="white" />
+          <View style={styles.brandIcon} accessibilityRole="header" accessibilityLabel="Next Step">
+            <Ionicons name="school" size={28} color="#fff" />
           </View>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue</Text>
@@ -270,14 +270,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 32,
   },
-  logoContainer: {
+  brandIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: "#2563EB",
-    width: 64,
-    height: 64,
-    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
