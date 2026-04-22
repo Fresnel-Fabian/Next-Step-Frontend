@@ -1,6 +1,7 @@
 import { UserRole, useAuthStore } from '@/store/authStore';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
 export default function RootLayout() {
@@ -44,7 +45,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(admin)" />
@@ -52,6 +53,6 @@ export default function RootLayout() {
         <Stack.Screen name="(student)" />
       </Stack>
       <Toast />
-    </>
+    </SafeAreaProvider>
   );
 }

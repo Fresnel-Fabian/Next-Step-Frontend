@@ -163,9 +163,6 @@ export default function StudentScheduleScreen() {
     [events],
   );
 
-  // Count today's classes
-  const todayEvents = eventsForDate(fmt(new Date()));
-
   const scrollDone = useRef(false);
   const onGridLayout = useCallback(() => {
     if (!scrollDone.current) {
@@ -191,11 +188,6 @@ export default function StudentScheduleScreen() {
           <Text style={st.title} numberOfLines={1}>{headerTitle}</Text>
         </View>
         <View style={st.topRight}>
-          {todayEvents.length > 0 && (
-            <View style={st.todayBadge}>
-              <Text style={st.todayBadgeT}>{todayEvents.length} today</Text>
-            </View>
-          )}
           <View style={st.toggle}>
             <Pressable style={[st.togBtn, viewMode === 'week' && st.togOn]} onPress={() => setViewMode('week')}>
               <Text style={[st.togT, viewMode === 'week' && st.togTOn]}>Week</Text>
@@ -348,9 +340,6 @@ const st = StyleSheet.create({
   todayBtnT: { fontSize: 14, fontWeight: '600', color: '#3C4043' },
   arrows: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '600', color: '#3C4043', marginLeft: 6, flexShrink: 1 },
-
-  todayBadge: { backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  todayBadgeT: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
 
   toggle: { flexDirection: 'row', borderWidth: 1, borderColor: '#DADCE0', borderRadius: 10, overflow: 'hidden' },
   togBtn: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#fff' },

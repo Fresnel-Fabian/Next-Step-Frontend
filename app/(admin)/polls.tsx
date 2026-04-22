@@ -1,4 +1,5 @@
 import { CreatePollData, DataService, Poll, PollResults } from '@/services/dataService';
+import { handleApiError } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
@@ -265,58 +266,70 @@ function PollCard({
   poll: Poll;
   onClose: (id: number) => void;
   onViewResults: (id: number) => void;
-  onDelete: (id: number) => void;  // ✅ new
+  onDelete: (id: number) => void;
 }) {
+  const voteLine =
+    poll.totalVotes === 0
+      ? 'No responses'
+      : `${poll.totalVotes} vote${poll.totalVotes !== 1 ? 's' : ''}`;
+
+  const optionCount = poll.options?.length ?? 0;
+  const optionsLine =
+    optionCount === 1 ? '1 option' : `${optionCount} options`;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.cardTitleRow}>
-          <Text style={styles.cardTitle} numberOfLines={2}>{poll.title}</Text>
-          <View style={[styles.badge, poll.isActive ? styles.badgeActive : styles.badgeClosed]}>
-            <Text style={[styles.badgeText, poll.isActive ? styles.badgeTextActive : styles.badgeTextClosed]}>
-              {poll.isActive ? 'Active' : 'Closed'}
-            </Text>
+        <View style={styles.cardTopRow}>
+          <Ionicons name="bar-chart-outline" size={16} color="#9CA3AF" style={styles.cardTypeIcon} />
+          <View style={styles.cardHeaderMain}>
+            <View style={styles.cardTitleRow}>
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                {poll.title}
+              </Text>
+              <View style={[styles.badge, poll.isActive ? styles.badgeActive : styles.badgeClosed]}>
+                <Text style={[styles.badgeText, poll.isActive ? styles.badgeTextActive : styles.badgeTextClosed]}>
+                  {poll.isActive ? 'Active' : 'Closed'}
+                </Text>
+              </View>
+            </View>
+            {poll.description ? (
+              <Text style={styles.cardDesc} numberOfLines={2}>
+                {poll.description}
+              </Text>
+            ) : null}
           </View>
         </View>
-        {poll.description && <Text style={styles.cardDesc}>{poll.description}</Text>}
       </View>
 
       <View style={styles.optionsPreview}>
-        {poll.options.slice(0, 3).map(opt => (
-          <View key={opt.id} style={styles.optionChip}>
-            <Text style={styles.optionChipText}>{opt.text}</Text>
-          </View>
-        ))}
-        {poll.options.length > 3 && (
-          <View style={styles.optionChip}>
-            <Text style={styles.optionChipText}>+{poll.options.length - 3} more</Text>
-          </View>
-        )}
+        <Text style={styles.voteCountText}>{optionsLine}</Text>
       </View>
 
       <View style={styles.cardFooter}>
         <View style={styles.voteCount}>
-          <Ionicons name="people-outline" size={14} color="#6B7280" />
-          <Text style={styles.voteCountText}>{poll.totalVotes} votes</Text>
+          <Ionicons name="stats-chart-outline" size={15} color="#6B7280" />
+          <Text style={styles.voteCountText}>{voteLine}</Text>
         </View>
-        <Text style={styles.timeLeft}>{poll.timeLeft}</Text>
+        <Text style={styles.timeLeft} numberOfLines={1}>
+          {poll.timeLeft}
+        </Text>
       </View>
 
       <View style={styles.cardActions}>
         <Pressable style={styles.resultsBtn} onPress={() => onViewResults(poll.id)}>
-          <Ionicons name="bar-chart-outline" size={16} color="#2563EB" />
+          <Ionicons name="bar-chart-outline" size={18} color="#FFFFFF" />
           <Text style={styles.resultsBtnText}>View Results</Text>
         </Pressable>
-        {poll.isActive && (
+        {poll.isActive ? (
           <Pressable style={styles.closeBtn} onPress={() => onClose(poll.id)}>
             <Ionicons name="stop-circle-outline" size={16} color="#EF4444" />
             <Text style={styles.closeBtnText}>Close</Text>
           </Pressable>
-        )}
-        {/* ✅ Delete button — always visible */}
+        ) : null}
         <Pressable style={styles.deleteBtn} onPress={() => onDelete(poll.id)}>
-          <Ionicons name="trash-outline" size={16} color="#EF4444" />
-          <Text style={styles.closeBtnText}>Delete</Text>
+          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+          <Text style={styles.deleteBtnText}>Delete</Text>
         </Pressable>
       </View>
     </View>
@@ -353,8 +366,22 @@ export default function AdminPolls() {
   const handleClosePoll = async (id: number) => {
     try {
       await DataService.closePoll(id);
-      Toast.show({ type: 'success', text1: 'Poll closed successfully' });
-      fetchPolls();
+      Toast.show({
+        type: 'success',
+        text1: 'Poll closed',
+        ...(filter === 'active'
+          ? {
+              text2: 'Switched to All — you can delete or manage the poll below.',
+              visibilityTime: 2800,
+            }
+          : {}),
+      });
+      // Closed polls are no longer "active"; they disappear from the Active tab only.
+      if (filter === 'active') {
+        setFilter('all');
+      } else {
+        fetchPolls();
+      }
     } catch {
       Toast.show({ type: 'error', text1: 'Failed to close poll' });
     }
@@ -374,8 +401,13 @@ export default function AdminPolls() {
               await DataService.deletePoll(id);
               Toast.show({ type: 'success', text1: 'Poll deleted' });
               fetchPolls();
-            } catch {
-              Toast.show({ type: 'error', text1: 'Failed to delete poll' });
+            } catch (e) {
+              const err = handleApiError(e);
+              Toast.show({
+                type: 'error',
+                text1: 'Failed to delete poll',
+                text2: err.message,
+              });
             }
           },
         },
@@ -484,16 +516,25 @@ const styles = StyleSheet.create({
   filterTextActive: { color: 'white' },
   list: { padding: 16, paddingTop: 4, gap: 12 },
   card: {
-    backgroundColor: 'white', borderRadius: 12, padding: 16,
-    borderWidth: 1, borderColor: '#F3F4F6',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   cardHeader: { marginBottom: 12 },
+  cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  cardTypeIcon: { marginTop: 2 },
+  cardHeaderMain: { flex: 1, minWidth: 0 },
   cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1 },
-  cardDesc: { fontSize: 13, color: '#6B7280', marginTop: 4 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#111827', flex: 1, minWidth: 0 },
+  cardDesc: { fontSize: 14, color: '#6B7280', marginTop: 6, lineHeight: 20 },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, flexShrink: 0 },
   badgeActive: { backgroundColor: '#D1FAE5' },
   badgeClosed: { backgroundColor: '#F3F4F6' },
   badgeText: { fontSize: 11, fontWeight: '600' },
@@ -501,31 +542,72 @@ const styles = StyleSheet.create({
   badgeTextClosed: { color: '#6B7280' },
   optionsPreview: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   optionChip: {
-    backgroundColor: '#EFF6FF', borderRadius: 6,
-    paddingHorizontal: 10, paddingVertical: 4,
+    maxWidth: 160,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   optionChipText: { fontSize: 12, color: '#2563EB', fontWeight: '500' },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  voteCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  voteCount: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minWidth: 0 },
   voteCountText: { fontSize: 12, color: '#6B7280' },
-  timeLeft: { fontSize: 12, color: '#6B7280' },
-  cardActions: { flexDirection: 'row', gap: 8, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 12 },
+  timeLeft: { fontSize: 12, color: '#6B7280', flexShrink: 0, textAlign: 'right' },
+  cardActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 12,
+  },
   resultsBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#EFF6FF', paddingVertical: 8, borderRadius: 8,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 104,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2563EB',
+    paddingVertical: 12,
+    borderRadius: 8,
   },
-  resultsBtnText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+  resultsBtnText: { fontSize: 13, color: '#FFFFFF', fontWeight: '600' },
   closeBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#FEF2F2', paddingVertical: 8, borderRadius: 8,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 104,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    paddingVertical: 12,
+    borderRadius: 8,
   },
-  // ✅ new delete button style
   deleteBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#FEF2F2', paddingVertical: 8, borderRadius: 8,
-    borderWidth: 1, borderColor: '#FECACA',
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 104,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
   },
   closeBtnText: { fontSize: 13, color: '#EF4444', fontWeight: '600' },
+  deleteBtnText: { fontSize: 13, color: '#EF4444', fontWeight: '600' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 40 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#374151' },
   emptyDesc: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 8 },
