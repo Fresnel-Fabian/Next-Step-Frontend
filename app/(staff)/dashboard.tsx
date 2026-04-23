@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -59,18 +60,59 @@ export default function StaffDashboard() {
     }
   };
 
-  const handleDismissActivity = (id: string) => {
+  const handleDismissActivity = async (id: string) => {
+    const previous = activities;
     setActivities(prev => prev.filter(a => a.id !== id));
+    try {
+      await DataService.deleteActivity(id);
+    } catch (err) {
+      setActivities(previous);
+      Toast.show({
+        type: 'error',
+        text1: 'Could not dismiss',
+        position: 'top',
+        visibilityTime: 2000,
+      });
+    }
   };
 
   const handleClearAll = () => {
-    setActivities([]);
-    Toast.show({ type: 'success', text1: 'Activity cleared', position: 'top', visibilityTime: 1500 });
+    Alert.alert(
+      'Clear all activity?',
+      "This will remove all activity items. This can't be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear all',
+          style: 'destructive',
+          onPress: async () => {
+            const previous = activities;
+            setActivities([]);
+            try {
+              await DataService.deleteAllActivity();
+              Toast.show({
+                type: 'success',
+                text1: 'Activity cleared',
+                position: 'top',
+                visibilityTime: 1500,
+              });
+            } catch (err) {
+              setActivities(previous);
+              Toast.show({
+                type: 'error',
+                text1: 'Could not clear activity',
+                position: 'top',
+                visibilityTime: 2000,
+              });
+            }
+          },
+        },
+      ],
+    );
   };
 
-  const handleLogout = () => {
-    Toast.show({ type: 'info', text1: 'Logging out', text2: 'See you soon!', position: 'top', visibilityTime: 1500 });
-    setTimeout(() => logout(), 500);
+  const handleLogout = async () => {
+    await logout();
   };
 
   const handleRefresh = () => {
