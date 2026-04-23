@@ -32,7 +32,7 @@ When adding a feature that exists for multiple roles, the same screen name (e.g.
 
 ### RoleTabsShell — one shell, three layouts
 
-`components/layout/RoleTabsShell.tsx` is the chrome rendered by each role's `_layout.tsx`. Each role layout passes a `navItems: RoleNavItem[]` array declaring its tabs. The shell branches on screen width (`< 768px` = mobile):
+`components/layout/RoleTabsShell.tsx` is the chrome rendered by each role's `_layout.tsx`. Each role layout passes a `navItems: RoleNavItem[]` array declaring its tabs. The shell branches on `MOBILE_BREAKPOINT` from `lib/breakpoints.ts` (currently 768px):
 
 - **Mobile**: bottom `Tabs` bar + frosted glass top bar. Items with `segment === 'notification'` or `'settings'` are hidden from the tab bar (`href: null`) and surfaced as top-right icons instead.
 - **Desktop/web**: collapsible left sidebar; the `Tabs` bar is rendered with `height: 0` (hidden) so expo-router still mounts the tab screens as routes.

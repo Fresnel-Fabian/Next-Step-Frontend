@@ -1,11 +1,9 @@
 import { useWindowDimensions } from 'react-native';
-
-/** Matches app shell `(admin|staff|student)/_layout` mobile breakpoint */
-export const DASHBOARD_COMPACT_BREAKPOINT = 768;
+import { MOBILE_BREAKPOINT } from './breakpoints';
 
 export function useDashboardCompact() {
   const { width } = useWindowDimensions();
-  const isCompact = width < DASHBOARD_COMPACT_BREAKPOINT;
+  const isCompact = width < MOBILE_BREAKPOINT;
   return {
     isCompact,
     /** Scroll content horizontal padding */

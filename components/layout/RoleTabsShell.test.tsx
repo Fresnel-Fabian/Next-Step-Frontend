@@ -3,6 +3,7 @@ import { render } from '@testing-library/react-native';
 import { useWindowDimensions } from 'react-native';
 import { RoleTabsShell, RoleNavItem } from './RoleTabsShell';
 import { useAuthStore, UserRole } from '@/store/authStore';
+import { MOBILE_BREAKPOINT } from '@/lib/breakpoints';
 
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions');
 
@@ -38,5 +39,16 @@ describe('RoleTabsShell', () => {
       <RoleTabsShell navItems={navItems} roleName="Admin" avatarFallback="A" />,
     );
     expect(getByTestId('tabs')).toBeTruthy();
+  });
+
+  it('renders desktop sidebar at exactly MOBILE_BREAKPOINT (768)', () => {
+    // Branching is width < MOBILE_BREAKPOINT, so width === 768 is desktop.
+    setDimensions(MOBILE_BREAKPOINT);
+    const { getByTestId } = render(
+      <RoleTabsShell navItems={navItems} roleName="Admin" avatarFallback="A" />,
+    );
+    expect(getByTestId('tabs')).toBeTruthy();
+    // Sidebar collapse chevron only renders in desktop mode.
+    expect(getByTestId('icon-chevron-back')).toBeTruthy();
   });
 });
