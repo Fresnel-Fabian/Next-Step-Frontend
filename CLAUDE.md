@@ -11,9 +11,10 @@ Expo + React Native (TypeScript). Package manager is npm.
   - In the CLI: `w` = web, `a` = Android emulator, `i` = iOS simulator, scan QR for Expo Go
 - `npx expo start --clear` — reset Metro cache (use when bundler misbehaves)
 - `npx expo install <pkg>` — add any package that touches device APIs (pins to the version compatible with the current Expo SDK). Use plain `npm install` only for pure JS libs.
+- `npm test` — run the Jest suite (preset: `jest-expo`). `npm run test:watch` for watch mode, `npm run test:coverage` for coverage. CI runs this on every PR to `master`.
 - Android release build: `npx expo prebuild --platform android && cd android && ./gradlew assembleRelease`
 
-There is no test runner wired up (`package.json` has no `test` script, and the single file under `components/__tests__/` is legacy). Don't claim tests were run.
+Test harness: tests colocate next to source (`foo.ts` → `foo.test.ts`). Global mocks live in `jest.setup.ts` (AsyncStorage, expo-router, expo-blur, expo-web-browser, expo-auth-session, expo-crypto, react-native-safe-area-context, react-native-reanimated, `@expo/vector-icons`). For endpoints on the Axios instance, use `axios-mock-adapter` on the `api` export so interceptors still fire.
 
 ## Architecture
 
