@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
 import { isSidebarRouteActive } from '@/lib/sidebarNav';
+import { MOBILE_BREAKPOINT } from '@/lib/breakpoints';
 
 export interface RoleNavItem {
   /** Must match the route file name (e.g. dashboard.tsx → "dashboard") */
@@ -24,7 +25,6 @@ export interface RoleNavItem {
   route: string;
 }
 
-const MOBILE_BREAKPOINT = 768;
 const SIDEBAR_WIDTH = 240;
 const SIDEBAR_COLLAPSED = 68;
 
@@ -173,9 +173,6 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
   const notificationItem = navItems.find(i => i.segment === 'notification');
   const settingsItem = navItems.find(i => i.segment === 'settings');
   const dashboardItem = navItems.find(i => i.segment === 'dashboard');
-  const visibleTabCount = navItems.filter(
-    i => i.segment !== 'notification' && i.segment !== 'settings',
-  ).length;
 
   const notifActive = notificationItem ? isActive(notificationItem.route) : false;
   const settingsActive = settingsItem ? isActive(settingsItem.route) : false;
@@ -248,7 +245,6 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
                 marginBottom: 2,
               },
               tabBarIconStyle: { marginTop: 4 },
-              tabBarScrollEnabled: isMobile && visibleTabCount > 4,
               tabBarStyle: isMobile
                 ? {
                     paddingTop: 6,
@@ -292,9 +288,6 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
                 minHeight: 48,
               },
               tabBarHideOnKeyboard: true,
-              sceneContainerStyle: {
-                backgroundColor: '#F9FAFB',
-              },
             }}
           >
             {navItems.map(item => {
