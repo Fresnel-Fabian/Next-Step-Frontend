@@ -173,19 +173,9 @@ export default function SettingsScreen() {
     });
   };
 
-  //  UPDATED: Logout with toast
-  const handleLogout = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Logging Out',
-      text2: 'See you soon!',
-      position: 'top',
-      visibilityTime: 2000,
-    });
-    
-    setTimeout(() => {
-      logout();
-    }, 500);
+  //  UPDATED: Logout (auth guard redirects to (auth)/login once user is null)
+  const handleLogout = async () => {
+    await logout();
   };
 
   const getInitials = () => {
