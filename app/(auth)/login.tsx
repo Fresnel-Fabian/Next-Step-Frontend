@@ -8,7 +8,7 @@
  * @see https://developers.google.com/identity/protocols/oauth2/web-server#node.js
  */
 import { GoogleAuthConfig } from "@/config/google-auth";
-import { useAuthStore } from "@/store/authStore";
+import { useLogin, useLoginWithGoogle } from "@/store/authStore";
 import { Ionicons } from "@expo/vector-icons";
 import {
   makeRedirectUri,
@@ -36,7 +36,8 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithGoogle } = useAuthStore();
+  const login = useLogin();
+  const loginWithGoogle = useLoginWithGoogle();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -47,7 +47,6 @@ Route-active matching uses `lib/sidebarNav.ts:isSidebarRouteActive`, which strip
 - **HTTP client**: `services/api.ts` — single Axios instance. Injects `Authorization: Bearer <token>` from AsyncStorage via a request interceptor; a response interceptor clears stored creds on 401. All backend calls go through this instance.
 - **Dev API base URL** is computed at import time: Android → `http://10.0.2.2:8000/`, everything else → `http://127.0.0.1:8000/`. To test on a physical device, set `API_URL` in `config/api.ts` to your LAN IP (e.g. `http://192.168.1.5:8000/`) — that override wins over the platform default.
 - **Data calls**: `services/dataService.ts` — thin typed wrappers around `api` for domain endpoints (schedules, dashboard, documents, polls, notifications, etc.). Prefer adding methods here over calling `api` directly from screens.
-- **Google Drive**: `services/googleDriveService.ts` talks to the Drive REST API directly using a separate OAuth access token stored under `GOOGLE_ACCESS_TOKEN_KEY` — this is distinct from the backend `auth_token`.
 
 ### Import alias
 

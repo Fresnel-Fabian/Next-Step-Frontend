@@ -2,7 +2,7 @@ import { ActivityItem } from '@/components/dashboard/ActivityItem';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ActivityLog, DashboardStats, DataService } from '@/services/dataService';
 import { useDashboardCompact } from '@/lib/dashboardResponsive';
-import { useAuthStore } from '@/store/authStore';
+import { useUser } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
@@ -16,7 +16,7 @@ import {
 import Toast from 'react-native-toast-message';
 
 export default function AdminDashboard() {
-  const { user } = useAuthStore();
+  const user = useUser();
   const {
     isCompact,
     contentPaddingX,

@@ -2,7 +2,7 @@ import { ActivityItem } from '@/components/dashboard/ActivityItem';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ActivityLog, DataService, Poll, ScheduleDTO } from '@/services/dataService';
 import { useDashboardCompact } from '@/lib/dashboardResponsive';
-import { useAuthStore } from '@/store/authStore';
+import { useUser } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -18,7 +18,7 @@ import Toast from 'react-native-toast-message';
 
 export default function StudentDashboard() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const user = useUser();
   const {
     isCompact,
     contentPaddingX,

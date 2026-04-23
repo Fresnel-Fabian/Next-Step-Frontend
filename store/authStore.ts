@@ -181,3 +181,7 @@ export const useIsAuthenticated = () => useAuthStore((state) => !!state.user);
 export const useIsAdmin = () =>
   useAuthStore((state) => state.user?.role === UserRole.ADMIN);
 export const useAuthLoading = () => useAuthStore((state) => state.isLoading);
+export const useLogin = () => useAuthStore((s) => s.login);
+export const useLogout = () => useAuthStore((s) => s.logout);
+export const useLoginWithGoogle = () => useAuthStore((s) => s.loginWithGoogle);
+export const useCheckAuth = () => useAuthStore((s) => s.checkAuth);

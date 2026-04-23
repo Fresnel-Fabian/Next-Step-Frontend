@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuthStore } from '@/store/authStore';
+import { useLogout, useUser } from '@/store/authStore';
 import { isSidebarRouteActive } from '@/lib/sidebarNav';
 
 export interface RoleNavItem {
@@ -80,7 +80,8 @@ export function RoleTabsShell({ navItems, roleName, avatarFallback }: RoleTabsSh
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { logout, user } = useAuthStore();
+  const user = useUser();
+  const logout = useLogout();
   const { width: screenWidth } = useWindowDimensions();
   const isMobile = screenWidth < MOBILE_BREAKPOINT;
   const [collapsed, setCollapsed] = useState(false);

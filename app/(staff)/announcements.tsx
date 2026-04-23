@@ -1,7 +1,7 @@
 import { Announcement, CreateAnnouncementData, DataService } from '@/services/dataService';
 import { handleApiError } from '@/services/api';
 import { resolveFileOpenUrl } from '@/lib/resolveFileUrl';
-import { useAuthStore } from '@/store/authStore';
+import { useUser } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useMemo, useState } from 'react';
@@ -306,7 +306,7 @@ function AnnouncementCard({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function StaffAnnouncements() {
-  const { user } = useAuthStore();
+  const user = useUser();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
