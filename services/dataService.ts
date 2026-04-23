@@ -2,8 +2,10 @@
  * Data Service - API calls for all data operations
  */
 
+import { TOKEN_KEY, forceLogoutOn401 } from "@/lib/authLogout";
 import { CreateDocumentData, DocumentItem } from "@/types/document";
 import api, { API_BASE_URL, handleApiError } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ============================================
 // Re-export DocumentItem so existing imports work
@@ -31,14 +33,6 @@ export interface ActivityLog {
   title: string;
   author: string;
   timestamp: string;
-}
-
-export interface StaffScheduleItem {
-  id: string;
-  time: string;
-  title: string;
-  location: string;
-  isStartingSoon: boolean;
 }
 
 // ============================================
@@ -312,24 +306,6 @@ export class DataService {
       };
     } catch (error) {
       throw handleApiError(error);
-    }
-  }
-
-  static async getTodaySchedule(): Promise<StaffScheduleItem[]> {
-    try {
-      const response = await api.get<ScheduleDTO[]>('/api/v1/schedules', {
-        params: { status: 'Active' },
-      });
-      // Map department schedules to staff schedule items (placeholder format)
-      return (response.data || []).slice(0, 5).map((s, i) => ({
-        id: s.id,
-        time: `${9 + i}:00 AM`,
-        title: s.department,
-        location: 'Room TBD',
-        isStartingSoon: i === 0,
-      }));
-    } catch (error) {
-      return [];
     }
   }
 
@@ -705,8 +681,7 @@ static async deleteAllActivity(): Promise<void> {
   file?: File; // web File object from expo-document-picker
 }): Promise<{ fileUrl: string; fileName: string; fileSize: number }> {
   try {
-    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-    const token = await AsyncStorage.getItem('auth_token');
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
 
     const formData = new FormData();
 
@@ -720,7 +695,10 @@ static async deleteAllActivity(): Promise<void> {
       formData.append('file', blob, fileAsset.name);
     }
 
-    // Use native fetch — NOT axios — so browser sets correct multipart boundary
+    // Use native fetch — NOT axios — so browser sets correct multipart boundary.
+    // Caveat: this bypasses the axios response interceptor, so we must mirror
+    // its 401 handling here (clear persisted auth) or an expired token during
+    // upload leaves the user pseudo-logged-in.
     const response = await fetch(`${API_BASE_URL}api/v1/documents/upload`, {
       method: 'POST',
       headers: {
@@ -730,8 +708,20 @@ static async deleteAllActivity(): Promise<void> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Upload failed');
+      if (response.status === 401) {
+        await forceLogoutOn401();
+      }
+      // The error body may not be JSON (e.g. an HTML 502/504 page from a proxy);
+      // fall back to statusText so we surface something useful instead of a
+      // misleading SyntaxError.
+      let detail: string | undefined;
+      try {
+        const parsed = await response.json();
+        detail = parsed?.detail;
+      } catch {
+        detail = undefined;
+      }
+      throw new Error(detail || response.statusText || 'Upload failed');
     }
 
     return await response.json();

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MockAdapter from 'axios-mock-adapter';
 import api from './api';
 import { DataService } from './dataService';
@@ -89,5 +90,77 @@ describe('DataService.getNotifications', () => {
       sender: 'System',
     });
     expect(typeof result[0].time).toBe('string');
+  });
+});
+
+describe('DataService.uploadFile', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  /**
+   * `uploadFile` uses `fetch` (not axios) so the axios 401 interceptor
+   * cannot clear the stored token for it. Bug 1 fix: call `forceLogoutOn401`
+   * inline on 401 so an expired token during upload doesn't leave the user
+   * pseudo-logged-in.
+   */
+  it('clears persisted auth on 401 and throws', async () => {
+    await AsyncStorage.setItem('auth_token', 'jwt-stale');
+    await AsyncStorage.setItem('user', JSON.stringify({ id: 'u1' }));
+
+    // First fetch call is the blob fetch from fileAsset.uri; second is the upload.
+    global.fetch = jest
+      .fn()
+      // blob fetch
+      .mockResolvedValueOnce({
+        blob: async () => new Blob(['hi'], { type: 'text/plain' }),
+      })
+      // upload POST → 401
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        json: async () => ({ detail: 'Token expired' }),
+      }) as unknown as typeof fetch;
+
+    await expect(
+      DataService.uploadFile({ uri: 'file://x', name: 'a.txt', type: 'text/plain' }),
+    ).rejects.toMatchObject({ message: 'Token expired' });
+
+    // Bug 1 core assertion: token + user are gone even though the upload went
+    // through `fetch`, not axios.
+    expect(await AsyncStorage.getItem('auth_token')).toBeNull();
+    expect(await AsyncStorage.getItem('user')).toBeNull();
+  });
+
+  it('falls back to statusText on a non-JSON error body (no SyntaxError)', async () => {
+    await AsyncStorage.setItem('auth_token', 'jwt-ok');
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        blob: async () => new Blob(['hi'], { type: 'text/plain' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        // Simulates an HTML body from a reverse proxy
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON at position 0');
+        },
+      }) as unknown as typeof fetch;
+
+    const err = await DataService.uploadFile({
+      uri: 'file://x',
+      name: 'a.txt',
+      type: 'text/plain',
+    }).catch((e) => e);
+
+    // handleApiError wraps the Error → { message, ... }
+    expect(err).toBeDefined();
+    expect(err.message).toBe('Bad Gateway');
   });
 });
