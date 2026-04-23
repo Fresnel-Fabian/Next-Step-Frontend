@@ -1,8 +1,9 @@
 import { Redirect } from 'expo-router';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthLoading, useUser } from '@/store/authStore';
 
 export default function Index() {
-  const { user, isLoading } = useAuthStore();
+  const user = useUser();
+  const isLoading = useAuthLoading();
 
   if (isLoading) {
     return null;

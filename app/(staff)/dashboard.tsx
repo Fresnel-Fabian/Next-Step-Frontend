@@ -1,7 +1,7 @@
 import { ActivityItem } from '@/components/dashboard/ActivityItem';
 import { useDashboardCompact } from '@/lib/dashboardResponsive';
 import { ActivityLog, DashboardStats, DataService } from '@/services/dataService';
-import { useAuthStore } from '@/store/authStore';
+import { useLogout, useUser } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -17,7 +17,8 @@ import Toast from 'react-native-toast-message';
 
 export default function StaffDashboard() {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const user = useUser();
+  const logout = useLogout();
   const {
     isCompact,
     contentPaddingX,

@@ -1,4 +1,4 @@
-import { UserRole, useAuthStore } from '@/store/authStore';
+import { UserRole, useAuthLoading, useCheckAuth, useUser } from '@/store/authStore';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,7 +7,9 @@ import Toast from 'react-native-toast-message';
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const { user, isLoading, checkAuth } = useAuthStore();
+  const user = useUser();
+  const isLoading = useAuthLoading();
+  const checkAuth = useCheckAuth();
 
   useEffect(() => {
     checkAuth();

@@ -1,5 +1,5 @@
 import { Toggle } from '@/components/ui/Toggle';
-import { useAuthStore } from '@/store/authStore';
+import { useLogout, useUser } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -18,7 +18,8 @@ import Toast from 'react-native-toast-message';
 
 export default function SettingsScreen() {
   const router = useRouter(); //  ADD THIS
-  const { user, logout } = useAuthStore();
+  const user = useUser();
+  const logout = useLogout();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
 
