@@ -1,17 +1,16 @@
-import { CreatePollData, DataService, Poll, PollResults } from '@/services/dataService';
 import { handleApiError } from '@/services/api';
+import { CreatePollData, DataService, Poll, PollResults } from '@/services/dataService';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
@@ -345,6 +344,8 @@ export default function AdminPolls() {
   const [showCreate, setShowCreate] = useState(false);
   const [resultsId, setResultsId] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
   useEffect(() => {
     fetchPolls();
@@ -388,32 +389,24 @@ export default function AdminPolls() {
   };
 
   const handleDeletePoll = (id: number) => {
-    Alert.alert(
-      'Delete Poll',
-      'Are you sure you want to permanently delete this poll? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await DataService.deletePoll(id);
-              Toast.show({ type: 'success', text1: 'Poll deleted' });
-              fetchPolls();
-            } catch (e) {
-              const err = handleApiError(e);
-              Toast.show({
-                type: 'error',
-                text1: 'Failed to delete poll',
-                text2: err.message,
-              });
-            }
-          },
-        },
-      ],
-    );
-  };
+  setDeleteId(id);
+  setDeleteModalVisible(true);
+};
+
+const confirmDelete = async () => {
+  if (!deleteId) return;
+  try {
+    await DataService.deletePoll(deleteId);
+    Toast.show({ type: 'success', text1: 'Poll deleted' });
+    fetchPolls();
+  } catch (e) {
+    const err = handleApiError(e);
+    Toast.show({ type: 'error', text1: 'Failed to delete poll', text2: err.message });
+  } finally {
+    setDeleteModalVisible(false);
+    setDeleteId(null);
+  }
+};
 
   const handleViewResults = (id: number) => {
     setResultsId(id);
@@ -473,6 +466,23 @@ export default function AdminPolls() {
         </ScrollView>
       )}
 
+      {/* Delete Confirmation Modal */}
+      <Modal visible={deleteModalVisible} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setDeleteModalVisible(false)}>
+          <Pressable style={styles.confirmBox} onPress={e => e.stopPropagation()}>
+            <Text style={styles.confirmTitle}>Delete Poll?</Text>
+            <Text style={styles.confirmMsg}>This cannot be undone.</Text>
+            <View style={styles.confirmBtns}>
+              <Pressable style={styles.confirmCancel} onPress={() => setDeleteModalVisible(false)}>
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.confirmDelete} onPress={confirmDelete}>
+                <Text style={styles.confirmDeleteText}>Delete</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <CreatePollModal
         visible={showCreate}
         onClose={() => setShowCreate(false)}
@@ -680,4 +690,22 @@ const styles = StyleSheet.create({
   voterChoice: { fontSize: 12, color: '#6B7280' },
   voterTime: { fontSize: 11, color: '#9CA3AF' },
   emptyText: { textAlign: 'center', color: '#9CA3AF', marginTop: 20 },
+  confirmBox: {
+  backgroundColor: '#fff', borderRadius: 16, padding: 24,
+  margin: 32, gap: 12,
+},
+confirmTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+confirmMsg: { fontSize: 14, color: '#6B7280' },
+confirmBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
+confirmCancel: {
+  flex: 1, paddingVertical: 12, borderRadius: 8,
+  backgroundColor: '#F3F4F6', alignItems: 'center',
+},
+confirmCancelText: { fontWeight: '600', color: '#6B7280' },
+confirmDelete: {
+  flex: 1, paddingVertical: 12, borderRadius: 8,
+  backgroundColor: '#EF4444', alignItems: 'center',
+},
+confirmDeleteText: { fontWeight: '600', color: '#fff' },
+
 });
