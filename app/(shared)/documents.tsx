@@ -1,461 +1,273 @@
-import { DocumentListItem } from '@/components/documents/DocumentListItem';
-import { useDashboardCompact } from '@/lib/dashboardResponsive';
-import { DataService, DocumentItem } from '@/services/dataService';
+// app/(shared)/documents.tsx
+// Used by both teachers (staff) and students
+import api from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
+const BASE_URL = 'http://127.0.0.1:8000';
+
+type Tab = 'general' | 'announcements';
+
+interface Document {
+  id: number;
+  title: string;
+  category: string;
+  description: string | null;
+  fileUrl: string;
+  fileSize: number;
+  accessLevel: string;
+  createdAt: string;
+}
+
+interface AnnouncementAttachment {
+  id: number;
+  title: string;
+  message: string;
+  file_url: string;
+  file_name: string | null;
+  created_at: string;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
 export default function DocumentsScreen() {
-  const insets = useSafeAreaInsets();
-  const { isCompact, contentPaddingX, contentPaddingY, sectionGap } = useDashboardCompact();
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [tab, setTab] = useState<Tab>('general');
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [attachments, setAttachments] = useState<AnnouncementAttachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
 
-  useEffect(() => {
-    loadDocuments();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
 
-  const loadDocuments = async () => {
+  const fetchAll = async () => {
+    setLoading(true);
+    await Promise.all([fetchDocuments(), fetchAttachments()]);
+    setLoading(false);
+  };
+
+  const fetchDocuments = async () => {
     try {
-      setLoading(true);
-      const data = await DataService.getDocuments();
-      setDocuments(data);
+      const res = await api.get('/api/v1/documents');
+      setDocuments(res.data);
     } catch {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to load documents',
-        text2: 'Check your connection and try again.',
-        position: 'top',
-        visibilityTime: 3000,
-      });
-    } finally {
-      setLoading(false);
+      Toast.show({ type: 'error', text1: 'Failed to load documents', position: 'top' });
     }
   };
 
-  const headerTop = Math.max(insets.top, 10) + (isCompact ? 6 : 10);
-
-  const handlePreview = (doc: DocumentItem) => {
-    setPreviewDoc(doc);
+  const fetchAttachments = async () => {
+    try {
+      const res = await api.get('/api/v1/documents/announcement-attachments');
+      setAttachments(res.data);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to load attachments', position: 'top' });
+    }
   };
 
-  const handleDownload = (doc: DocumentItem) => {
-    console.log('Download:', doc.title);
-    Toast.show({
-      type: 'success',
-      text1: 'Download started',
-      text2: doc.title,
-      position: 'top',
-      visibilityTime: 2000,
-    });
+  const handleOpen = (url: string) => {
+    const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+    if (typeof window !== 'undefined') window.open(fullUrl, '_blank');
   };
 
-  const handleShare = (doc: DocumentItem) => {
-    Toast.show({
-      type: 'success',
-      text1: 'Ready to share',
-      text2: doc.title,
-      position: 'top',
-      visibilityTime: 2000,
-    });
-  };
-
-  const filteredDocuments = documents.filter(doc =>
-    doc.title.toLowerCase().includes(search.toLowerCase()),
+  const filteredDocs = documents.filter(d =>
+    d.title.toLowerCase().includes(search.toLowerCase())
+  );
+  const filteredAttachments = attachments.filter(a =>
+    a.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <View style={[styles.loadingContainer, { paddingHorizontal: contentPaddingX }]}>
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={styles.loadingHint}>Loading documents…</Text>
+  const renderDocument = ({ item }: { item: Document }) => (
+    <View style={styles.docRow}>
+      <View style={styles.docIcon}>
+        <Ionicons name="document-text-outline" size={22} color="#2563EB" />
       </View>
-    );
-  }
+      <View style={styles.docInfo}>
+        <Text style={styles.docTitle} numberOfLines={1}>{item.title}</Text>
+        <View style={styles.docMeta}>
+          <Text style={styles.docMetaText}>{item.category}</Text>
+          <Text style={styles.docMetaDot}>·</Text>
+          <Text style={styles.docMetaText}>{formatSize(item.fileSize)}</Text>
+          <Text style={styles.docMetaDot}>·</Text>
+          <Text style={styles.docMetaText}>{formatDate(item.createdAt)}</Text>
+        </View>
+        {item.description ? (
+          <Text style={styles.docDesc} numberOfLines={1}>{item.description}</Text>
+        ) : null}
+      </View>
+      <Pressable style={styles.openBtn} onPress={() => handleOpen(item.fileUrl)}>
+        <Ionicons name="open-outline" size={18} color="#2563EB" />
+      </Pressable>
+    </View>
+  );
 
-  const modalTop = Math.max(insets.top, 12);
+  const renderAttachment = ({ item }: { item: AnnouncementAttachment }) => (
+    <View style={styles.docRow}>
+      <View style={[styles.docIcon, { backgroundColor: '#FEF3C7' }]}>
+        <Ionicons name="megaphone-outline" size={22} color="#D97706" />
+      </View>
+      <View style={styles.docInfo}>
+        <Text style={styles.docTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.docMetaText} numberOfLines={1}>{item.message}</Text>
+        <Text style={[styles.docMetaText, { marginTop: 2 }]}>{formatDate(item.created_at)}</Text>
+      </View>
+      <Pressable style={styles.openBtn} onPress={() => handleOpen(item.file_url)}>
+        <Ionicons name="open-outline" size={18} color="#2563EB" />
+      </Pressable>
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
-      <View
-        style={[
-          styles.header,
-          isCompact && styles.headerCompact,
-          {
-            paddingHorizontal: contentPaddingX,
-            paddingTop: headerTop,
-            paddingBottom: isCompact ? 12 : 14,
-          },
-        ]}
-      >
-        <View style={styles.headerTextBlock}>
-          <Text style={[styles.title, isCompact && styles.titleCompact]}>Document Center</Text>
-          <Text style={[styles.subtitle, isCompact && styles.subtitleCompact]}>
-            Access and manage important documents
-          </Text>
-        </View>
+    <View style={styles.flex}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Documents</Text>
+        <Text style={styles.subtitle}>Access your documents and announcements</Text>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: contentPaddingX,
-          paddingTop: isCompact ? 8 : 12,
-          paddingBottom: contentPaddingY + Math.max(insets.bottom, 12),
-          gap: sectionGap,
-        }}
-      >
-        <View style={[styles.searchContainer, isCompact && styles.searchContainerCompact]}>
-          <Ionicons name="search-outline" size={18} color="#9CA3AF" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search documents…"
-            placeholderTextColor="#9CA3AF"
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-          />
-        </View>
+      {/* Tabs */}
+      <View style={styles.tabs}>
+        {(['general', 'announcements'] as Tab[]).map(t => (
+          <Pressable
+            key={t}
+            style={[styles.tab, tab === t && styles.tabActive]}
+            onPress={() => { setTab(t); setSearch(''); }}
+          >
+            <Ionicons
+              name={t === 'general' ? 'folder-outline' : 'megaphone-outline'}
+              size={15}
+              color={tab === t ? '#fff' : '#6B7280'}
+            />
+            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+              {t === 'general' ? 'General' : 'From Announcements'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
-        {filteredDocuments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={isCompact ? 44 : 48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No documents found</Text>
-            <Text style={styles.emptySubtitle}>
-              {search ? 'Try a different search term' : 'Documents will appear here when available'}
+      {/* Search */}
+      <View style={styles.searchRow}>
+        <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={tab === 'general' ? 'Search documents...' : 'Search announcements...'}
+          placeholderTextColor="#9CA3AF"
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+        />
+        {search.length > 0 && (
+          <Pressable onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+          </Pressable>
+        )}
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 40 }} />
+      ) : tab === 'general' ? (
+        filteredDocs.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="folder-open-outline" size={40} color="#D1D5DB" />
+            <Text style={styles.emptyText}>
+              {search ? 'No documents match your search' : 'No documents available yet'}
             </Text>
           </View>
         ) : (
-          filteredDocuments.map(doc => (
-            <DocumentListItem
-              key={doc.id}
-              document={doc}
-              compact={isCompact}
-              onPreview={() => handlePreview(doc)}
-              onDownload={() => handleDownload(doc)}
-            />
-          ))
-        )}
-      </ScrollView>
-
-      <Modal
-        visible={!!previewDoc}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setPreviewDoc(null)}
-      >
-        {previewDoc ? (
-          <View style={styles.modalContainer}>
-            <View
-              style={[
-                styles.modalHeader,
-                isCompact && styles.modalHeaderCompact,
-                { paddingTop: modalTop + 8, paddingHorizontal: contentPaddingX },
-              ]}
-            >
-              <View style={styles.modalHeaderLeft}>
-                <Pressable onPress={() => setPreviewDoc(null)} style={styles.closeButton} hitSlop={12}>
-                  <Ionicons name="close" size={24} color="white" />
-                </Pressable>
-                <Text style={[styles.modalTitle, isCompact && styles.modalTitleCompact]} numberOfLines={1}>
-                  {previewDoc.title}
-                </Text>
-                <View style={styles.modalSizeBadge}>
-                  <Text style={styles.modalSizeText}>{previewDoc.size}</Text>
-                </View>
-              </View>
-              <View style={[styles.modalHeaderRight, isCompact && styles.modalHeaderRightCompact]}>
-                <Pressable style={styles.modalIconButton} onPress={() => handleDownload(previewDoc)} hitSlop={8}>
-                  <Ionicons name="download-outline" size={20} color="white" />
-                </Pressable>
-                <Pressable style={styles.modalIconButton} onPress={() => handleShare(previewDoc)} hitSlop={8}>
-                  <Ionicons name="share-outline" size={20} color="white" />
-                </Pressable>
-                <Pressable style={styles.modalOpenButton}>
-                  <Text style={styles.modalOpenButtonText}>Open</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <ScrollView
-              style={styles.modalContent}
-              contentContainerStyle={[
-                styles.modalContentInner,
-                { paddingHorizontal: contentPaddingX, paddingBottom: contentPaddingY + Math.max(insets.bottom, 16) },
-              ]}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={[styles.previewDocument, isCompact && styles.previewDocumentCompact]}>
-                <Text style={styles.previewTitle}>{previewDoc.title}</Text>
-                <Text style={styles.previewCategory}>{previewDoc.category}</Text>
-
-                <View style={styles.previewTOC}>
-                  <Text style={styles.previewTOCTitle}>Table of Contents — Page 1</Text>
-                  <View style={styles.previewTOCList}>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>1. Introduction</Text>
-                      <Text style={styles.previewTOCPage}>Page 1</Text>
-                    </View>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>2. Mission and Values</Text>
-                      <Text style={styles.previewTOCPage}>Page 3</Text>
-                    </View>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>3. Policies and Procedures</Text>
-                      <Text style={styles.previewTOCPage}>Page 5</Text>
-                    </View>
-                    <View style={styles.previewTOCItem}>
-                      <Text style={styles.previewTOCText}>4. Code of Conduct</Text>
-                      <Text style={styles.previewTOCPage}>Page 8</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.previewNote}>
-                  <Text style={styles.previewNoteText}>
-                    Note: This is a preview. Download the full file to view all content.
-                  </Text>
-                </View>
-              </View>
-            </ScrollView>
+          <FlatList
+            data={filteredDocs}
+            keyExtractor={item => String(item.id)}
+            renderItem={renderDocument}
+            contentContainerStyle={styles.list}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            showsVerticalScrollIndicator={false}
+          />
+        )
+      ) : (
+        filteredAttachments.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="megaphone-outline" size={40} color="#D1D5DB" />
+            <Text style={styles.emptyText}>
+              {search ? 'No attachments match your search' : 'No announcement attachments yet'}
+            </Text>
           </View>
-        ) : null}
-      </Modal>
+        ) : (
+          <FlatList
+            data={filteredAttachments}
+            keyExtractor={item => String(item.id)}
+            renderItem={renderAttachment}
+            contentContainerStyle={styles.list}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            showsVerticalScrollIndicator={false}
+          />
+        )
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    gap: 12,
-  },
-  loadingHint: { fontSize: 14, color: '#9CA3AF' },
+  flex: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    padding: 20, paddingBottom: 12, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  headerCompact: { alignItems: 'center' },
-  headerTextBlock: { flex: 1, minWidth: 0 },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
+  title: { fontSize: 22, fontWeight: '700', color: '#111827', marginBottom: 2 },
+  subtitle: { fontSize: 13, color: '#6B7280' },
+  tabs: {
+    flexDirection: 'row', backgroundColor: '#F3F4F6',
+    margin: 16, marginBottom: 0, borderRadius: 12, padding: 4, gap: 4,
   },
-  titleCompact: { fontSize: 20 },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
+  tab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 9,
   },
-  subtitleCompact: { fontSize: 13 },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 12,
-    minHeight: 44,
-    paddingVertical: 8,
+  tabActive: { backgroundColor: '#2563EB' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  tabTextActive: { color: '#fff' },
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14,
+    paddingVertical: 10, margin: 16, marginBottom: 8,
+    borderWidth: 1, borderColor: '#E5E7EB',
   },
-  searchContainerCompact: {
-    paddingHorizontal: 10,
-    minHeight: 42,
+  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
+  list: { padding: 16, paddingTop: 8 },
+  docRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, backgroundColor: '#fff',
+    borderRadius: 12, paddingHorizontal: 14,
   },
-  searchIcon: {
-    marginRight: 8,
+  docIcon: {
+    width: 44, height: 44, borderRadius: 10,
+    backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center',
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111827',
-    padding: 0,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 320,
-    paddingHorizontal: 8,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  modalHeader: {
-    backgroundColor: '#1E293B',
-    paddingBottom: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  modalHeaderCompact: {
-    paddingBottom: 12,
-  },
-  modalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    minWidth: 160,
-  },
-  modalHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  },
-  modalHeaderRightCompact: {
-    width: '100%',
-    justifyContent: 'flex-end',
-    marginTop: 4,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    flex: 1,
-    minWidth: 0,
-  },
-  modalTitleCompact: { fontSize: 15 },
-  modalSizeBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    flexShrink: 0,
-  },
-  modalSizeText: {
-    fontSize: 11,
-    color: 'white',
-    fontWeight: '500',
-  },
-  modalIconButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  modalOpenButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#2563EB',
-  },
-  modalOpenButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-  },
-  modalContent: {
-    flex: 1,
-  },
-  modalContentInner: {
-    paddingTop: 20,
-  },
-  previewDocument: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 24,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  previewDocumentCompact: {
-    padding: 16,
-    gap: 12,
-  },
-  previewTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  previewCategory: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  previewTOC: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  previewTOCTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  previewTOCList: {
-    gap: 8,
-  },
-  previewTOCItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  previewTOCText: {
-    fontSize: 13,
-    color: '#4B5563',
-    flex: 1,
-  },
-  previewTOCPage: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    flexShrink: 0,
-  },
-  previewNote: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    padding: 12,
-  },
-  previewNoteText: {
-    fontSize: 12,
-    color: '#92400E',
-    lineHeight: 18,
-  },
+  docInfo: { flex: 1, gap: 3 },
+  docTitle: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  docMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  docMetaText: { fontSize: 11, color: '#9CA3AF' },
+  docMetaDot: { fontSize: 11, color: '#D1D5DB' },
+  docDesc: { fontSize: 11, color: '#9CA3AF' },
+  openBtn: { padding: 8 },
+  separator: { height: 8 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40 },
+  emptyText: { fontSize: 14, color: '#9CA3AF', textAlign: 'center' },
 });

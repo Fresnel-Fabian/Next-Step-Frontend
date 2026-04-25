@@ -833,7 +833,17 @@ static async deleteAllActivity(): Promise<void> {
       throw handleApiError(error);
     }
   }
+  
+  static async getAnnouncementAttachments(): Promise<any[]> {
+  try {
+    const res = await api.get('/api/v1/documents/announcement-attachments');
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 }
+}
+
 
 
 export default DataService;
