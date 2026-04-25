@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,73 @@ import {
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+
+// Web-safe date picker — uses native HTML input on web, DateTimePicker on mobile
+function DatePicker({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
+  if (Platform.OS === 'web') {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const toLocalISO = (d: Date) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return (
+      <input
+        type="datetime-local"
+        value={toLocalISO(value)}
+        min={toLocalISO(new Date())}
+        onChange={e => { if (e.target.value) onChange(new Date(e.target.value)); }}
+        style={{
+          width: '100%', padding: '10px 12px', fontSize: 14,
+          borderRadius: 8, border: '1px solid #E5E7EB',
+          backgroundColor: '#F9FAFB', color: '#111827', outline: 'none',
+          boxSizing: 'border-box',
+        } as any}
+      />
+    );
+  }
+  const DateTimePicker = require('@react-native-community/datetimepicker').default;
+  return (
+    <DateTimePicker
+      value={value}
+      mode="datetime"
+      minimumDate={new Date()}
+      display="default"
+      onChange={(_: any, d?: Date) => { if (d) onChange(d); }}
+    />
+  );
+}
+
+// ─── Countdown Hook ───────────────────────────────────────────────────────────
+
+function useCountdown(expiresAt?: string, isActive?: boolean) {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    if (!expiresAt || !isActive) {
+      setTimeLeft(isActive ? 'Open-ended' : 'Closed');
+      return;
+    }
+
+    const tick = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setTimeLeft('Expired');
+        return;
+      }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      if (d > 0) setTimeLeft(`${d}d ${h}h left`);
+      else if (h > 0) setTimeLeft(`${h}h ${m}m left`);
+      else setTimeLeft(`${m}m ${s}s left`);
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt, isActive]);
+
+  return timeLeft;
+}
 
 // ─── Create Poll Modal ────────────────────────────────────────────────────────
 
@@ -28,6 +96,8 @@ function CreatePollModal({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [options, setOptions] = useState(['', '']);
+  const [expiresAt, setExpiresAt] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const addOption = () => setOptions([...options, '']);
@@ -48,7 +118,7 @@ function CreatePollModal({
     }
     const filled = options.filter(o => o.trim());
     if (filled.length < 2) {
-      Toast.show({ type: 'error', text1: 'Add at least 2 food options' });
+      Toast.show({ type: 'error', text1: 'Add at least 2 options' });
       return;
     }
     try {
@@ -57,15 +127,17 @@ function CreatePollModal({
         title: title.trim(),
         description: description.trim() || undefined,
         options: filled.map((text, i) => ({ id: i + 1, text })),
+        expires_at: expiresAt ? expiresAt.toISOString() : undefined,
       };
       await DataService.createPoll(data);
       Toast.show({ type: 'success', text1: 'Poll created!', text2: 'Students can now vote' });
       setTitle('');
       setDescription('');
       setOptions(['', '']);
+      setExpiresAt(null);
       onCreated();
       onClose();
-    } catch (e) {
+    } catch {
       Toast.show({ type: 'error', text1: 'Failed to create poll' });
     } finally {
       setLoading(false);
@@ -76,8 +148,12 @@ function CreatePollModal({
     setTitle('');
     setDescription('');
     setOptions(['', '']);
+    setExpiresAt(null);
     onClose();
   };
+
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -106,6 +182,21 @@ function CreatePollModal({
               onChangeText={setDescription}
               placeholderTextColor="#9CA3AF"
             />
+
+            {/* Expiry Date */}
+            <Text style={styles.label}>End Date (optional)</Text>
+            <View style={styles.dateRow}>
+              <DatePicker
+                value={expiresAt || new Date(Date.now() + 86400000)}
+                onChange={date => setExpiresAt(date)}
+              />
+              {expiresAt && (
+                <Pressable onPress={() => setExpiresAt(null)} style={styles.clearDate}>
+                  <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                </Pressable>
+              )}
+            </View>
+
             <Text style={styles.label}>Food Options *</Text>
             {options.map((opt, i) => (
               <View key={i} style={styles.optionRow}>
@@ -144,6 +235,76 @@ function CreatePollModal({
           </ScrollView>
         </View>
       </View>
+    </Modal>
+  );
+}
+
+// ─── Edit Expiry Modal ────────────────────────────────────────────────────────
+
+function EditExpiryModal({
+  poll,
+  visible,
+  onClose,
+  onUpdated,
+}: {
+  poll: Poll | null;
+  visible: boolean;
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const [date, setDate] = useState<Date>(new Date(Date.now() + 86400000));
+  const [showPicker, setShowPicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (poll?.expiresAt) setDate(new Date(poll.expiresAt));
+    else setDate(new Date(Date.now() + 86400000));
+  }, [poll]);
+
+  const handleSave = async () => {
+    if (!poll) return;
+    try {
+      setLoading(true);
+      await DataService.updatePollExpiry(poll.id, date);
+      Toast.show({ type: 'success', text1: 'Expiry updated' });
+      onUpdated();
+      onClose();
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to update expiry' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={styles.confirmBox} onPress={e => e.stopPropagation()}>
+          <Text style={styles.confirmTitle}>Edit End Date</Text>
+          <Text style={styles.confirmMsg}>{poll?.title}</Text>
+
+          <DatePicker value={date} onChange={d => setDate(d)} />
+
+          <View style={styles.confirmBtns}>
+            <Pressable style={styles.confirmCancel} onPress={onClose}>
+              <Text style={styles.confirmCancelText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.confirmDelete, { backgroundColor: '#2563EB' }, loading && styles.btnDisabled]}
+              onPress={handleSave}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.confirmDeleteText}>Save</Text>
+              }
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -197,16 +358,10 @@ function ResultsModal({
               <Text style={styles.resultsTitle}>{results.title}</Text>
               <Text style={styles.resultsMeta}>{results.total_votes} votes total</Text>
               <View style={styles.tabRow}>
-                <Pressable
-                  style={[styles.tab, tab === 'chart' && styles.tabActive]}
-                  onPress={() => setTab('chart')}
-                >
+                <Pressable style={[styles.tab, tab === 'chart' && styles.tabActive]} onPress={() => setTab('chart')}>
                   <Text style={[styles.tabText, tab === 'chart' && styles.tabTextActive]}>Results</Text>
                 </Pressable>
-                <Pressable
-                  style={[styles.tab, tab === 'voters' && styles.tabActive]}
-                  onPress={() => setTab('voters')}
-                >
+                <Pressable style={[styles.tab, tab === 'voters' && styles.tabActive]} onPress={() => setTab('voters')}>
                   <Text style={[styles.tabText, tab === 'voters' && styles.tabTextActive]}>Who Voted</Text>
                 </Pressable>
               </View>
@@ -261,20 +416,27 @@ function PollCard({
   onClose,
   onViewResults,
   onDelete,
+  onEditExpiry,
 }: {
   poll: Poll;
   onClose: (id: number) => void;
   onViewResults: (id: number) => void;
   onDelete: (id: number) => void;
+  onEditExpiry: (poll: Poll) => void;
 }) {
+  const countdown = useCountdown(poll.expiresAt, poll.isActive);
+
   const voteLine =
     poll.totalVotes === 0
       ? 'No responses'
       : `${poll.totalVotes} vote${poll.totalVotes !== 1 ? 's' : ''}`;
 
   const optionCount = poll.options?.length ?? 0;
-  const optionsLine =
-    optionCount === 1 ? '1 option' : `${optionCount} options`;
+  const optionsLine = optionCount === 1 ? '1 option' : `${optionCount} options`;
+
+  const isExpiringSoon =
+    poll.isActive && poll.expiresAt &&
+    new Date(poll.expiresAt).getTime() - Date.now() < 3600000; // less than 1 hour
 
   return (
     <View style={styles.card}>
@@ -283,9 +445,7 @@ function PollCard({
           <Ionicons name="bar-chart-outline" size={16} color="#9CA3AF" style={styles.cardTypeIcon} />
           <View style={styles.cardHeaderMain}>
             <View style={styles.cardTitleRow}>
-              <Text style={styles.cardTitle} numberOfLines={2}>
-                {poll.title}
-              </Text>
+              <Text style={styles.cardTitle} numberOfLines={2}>{poll.title}</Text>
               <View style={[styles.badge, poll.isActive ? styles.badgeActive : styles.badgeClosed]}>
                 <Text style={[styles.badgeText, poll.isActive ? styles.badgeTextActive : styles.badgeTextClosed]}>
                   {poll.isActive ? 'Active' : 'Closed'}
@@ -293,9 +453,7 @@ function PollCard({
               </View>
             </View>
             {poll.description ? (
-              <Text style={styles.cardDesc} numberOfLines={2}>
-                {poll.description}
-              </Text>
+              <Text style={styles.cardDesc} numberOfLines={2}>{poll.description}</Text>
             ) : null}
           </View>
         </View>
@@ -310,9 +468,15 @@ function PollCard({
           <Ionicons name="stats-chart-outline" size={15} color="#6B7280" />
           <Text style={styles.voteCountText}>{voteLine}</Text>
         </View>
-        <Text style={styles.timeLeft} numberOfLines={1}>
-          {poll.timeLeft}
-        </Text>
+        {/* Countdown timer */}
+        {poll.isActive && (
+          <View style={[styles.countdownBadge, isExpiringSoon && styles.countdownBadgeUrgent]}>
+            <Ionicons name="time-outline" size={13} color={isExpiringSoon ? '#DC2626' : '#6B7280'} />
+            <Text style={[styles.countdownText, isExpiringSoon && styles.countdownTextUrgent]}>
+              {countdown}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.cardActions}>
@@ -321,10 +485,16 @@ function PollCard({
           <Text style={styles.resultsBtnText}>View Results</Text>
         </Pressable>
         {poll.isActive ? (
-          <Pressable style={styles.closeBtn} onPress={() => onClose(poll.id)}>
-            <Ionicons name="stop-circle-outline" size={16} color="#EF4444" />
-            <Text style={styles.closeBtnText}>Close</Text>
-          </Pressable>
+          <>
+            <Pressable style={styles.editExpiryBtn} onPress={() => onEditExpiry(poll)}>
+              <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+              <Text style={styles.editExpiryText}>End Date</Text>
+            </Pressable>
+            <Pressable style={styles.closeBtn} onPress={() => onClose(poll.id)}>
+              <Ionicons name="stop-circle-outline" size={16} color="#EF4444" />
+              <Text style={styles.closeBtnText}>Close</Text>
+            </Pressable>
+          </>
         ) : null}
         <Pressable style={styles.deleteBtn} onPress={() => onDelete(poll.id)}>
           <Ionicons name="trash-outline" size={18} color="#EF4444" />
@@ -345,11 +515,11 @@ export default function AdminPolls() {
   const [resultsId, setResultsId] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [editExpiryPoll, setEditExpiryPoll] = useState<Poll | null>(null);
+  const [showEditExpiry, setShowEditExpiry] = useState(false);
 
-  useEffect(() => {
-    fetchPolls();
-  }, [filter]);
+  useEffect(() => { fetchPolls(); }, [filter]);
 
   const fetchPolls = async () => {
     try {
@@ -370,47 +540,43 @@ const [deleteModalVisible, setDeleteModalVisible] = useState(false);
       Toast.show({
         type: 'success',
         text1: 'Poll closed',
-        ...(filter === 'active'
-          ? {
-              text2: 'Switched to All — you can delete or manage the poll below.',
-              visibilityTime: 2800,
-            }
-          : {}),
+        ...(filter === 'active' ? { text2: 'Switched to All', visibilityTime: 2800 } : {}),
       });
-      // Closed polls are no longer "active"; they disappear from the Active tab only.
-      if (filter === 'active') {
-        setFilter('all');
-      } else {
-        fetchPolls();
-      }
+      if (filter === 'active') setFilter('all');
+      else fetchPolls();
     } catch {
       Toast.show({ type: 'error', text1: 'Failed to close poll' });
     }
   };
 
   const handleDeletePoll = (id: number) => {
-  setDeleteId(id);
-  setDeleteModalVisible(true);
-};
+    setDeleteId(id);
+    setDeleteModalVisible(true);
+  };
 
-const confirmDelete = async () => {
-  if (!deleteId) return;
-  try {
-    await DataService.deletePoll(deleteId);
-    Toast.show({ type: 'success', text1: 'Poll deleted' });
-    fetchPolls();
-  } catch (e) {
-    const err = handleApiError(e);
-    Toast.show({ type: 'error', text1: 'Failed to delete poll', text2: err.message });
-  } finally {
-    setDeleteModalVisible(false);
-    setDeleteId(null);
-  }
-};
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await DataService.deletePoll(deleteId);
+      Toast.show({ type: 'success', text1: 'Poll deleted' });
+      fetchPolls();
+    } catch (e) {
+      const err = handleApiError(e);
+      Toast.show({ type: 'error', text1: 'Failed to delete poll', text2: err.message });
+    } finally {
+      setDeleteModalVisible(false);
+      setDeleteId(null);
+    }
+  };
 
   const handleViewResults = (id: number) => {
     setResultsId(id);
     setShowResults(true);
+  };
+
+  const handleEditExpiry = (poll: Poll) => {
+    setEditExpiryPoll(poll);
+    setShowEditExpiry(true);
   };
 
   return (
@@ -461,6 +627,7 @@ const confirmDelete = async () => {
               onClose={handleClosePoll}
               onViewResults={handleViewResults}
               onDelete={handleDeletePoll}
+              onEditExpiry={handleEditExpiry}
             />
           ))}
         </ScrollView>
@@ -483,6 +650,13 @@ const confirmDelete = async () => {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <EditExpiryModal
+        poll={editExpiryPoll}
+        visible={showEditExpiry}
+        onClose={() => { setShowEditExpiry(false); setEditExpiryPoll(null); }}
+        onUpdated={fetchPolls}
+      />
       <CreatePollModal
         visible={showCreate}
         onClose={() => setShowCreate(false)}
@@ -491,10 +665,7 @@ const confirmDelete = async () => {
       <ResultsModal
         pollId={resultsId}
         visible={showResults}
-        onClose={() => {
-          setShowResults(false);
-          setResultsId(null);
-        }}
+        onClose={() => { setShowResults(false); setResultsId(null); }}
       />
     </View>
   );
@@ -512,8 +683,7 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 14, color: '#6B7280', marginTop: 2 },
   newPollBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 10,
-    borderRadius: 10,
+    backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
   },
   newPollText: { color: 'white', fontWeight: '600', fontSize: 14 },
   filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
@@ -526,16 +696,10 @@ const styles = StyleSheet.create({
   filterTextActive: { color: 'white' },
   list: { padding: 16, paddingTop: 4, gap: 12 },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', borderRadius: 12, padding: 16,
+    borderWidth: 1, borderColor: '#F3F4F6',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
   cardHeader: { marginBottom: 12 },
   cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
@@ -551,70 +715,48 @@ const styles = StyleSheet.create({
   badgeTextActive: { color: '#059669' },
   badgeTextClosed: { color: '#6B7280' },
   optionsPreview: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  optionChip: {
-    maxWidth: 160,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
+  optionChip: { maxWidth: 160, backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
   optionChipText: { fontSize: 12, color: '#2563EB', fontWeight: '500' },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    gap: 8, marginBottom: 12,
   },
   voteCount: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minWidth: 0 },
   voteCountText: { fontSize: 12, color: '#6B7280' },
   timeLeft: { fontSize: 12, color: '#6B7280', flexShrink: 0, textAlign: 'right' },
+  countdownBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+  },
+  countdownBadgeUrgent: { backgroundColor: '#FEE2E2' },
+  countdownText: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  countdownTextUrgent: { color: '#DC2626', fontWeight: '700' },
   cardActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 12,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 12,
   },
   resultsBtn: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 104,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#2563EB',
-    paddingVertical: 12,
-    borderRadius: 8,
+    flexGrow: 1, flexBasis: '30%', minWidth: 104,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#2563EB', paddingVertical: 12, borderRadius: 8,
   },
   resultsBtnText: { fontSize: 13, color: '#FFFFFF', fontWeight: '600' },
+  editExpiryBtn: {
+    flexGrow: 1, flexBasis: '30%', minWidth: 104,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#EFF6FF', paddingVertical: 12, borderRadius: 8,
+  },
+  editExpiryText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
   closeBtn: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 104,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#FEF2F2',
-    paddingVertical: 12,
-    borderRadius: 8,
+    flexGrow: 1, flexBasis: '30%', minWidth: 104,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#FEF2F2', paddingVertical: 12, borderRadius: 8,
   },
   deleteBtn: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 104,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#EF4444',
+    flexGrow: 1, flexBasis: '30%', minWidth: 104,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#FFFFFF', paddingVertical: 12, borderRadius: 8,
+    borderWidth: 1.5, borderColor: '#EF4444',
   },
   closeBtnText: { fontSize: 13, color: '#EF4444', fontWeight: '600' },
   deleteBtnText: { fontSize: 13, color: '#EF4444', fontWeight: '600' },
@@ -627,44 +769,37 @@ const styles = StyleSheet.create({
     padding: 20, maxHeight: '90%',
   },
   modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 20,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20,
   },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
   input: {
     borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827',
-    marginBottom: 16,
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827', marginBottom: 16,
   },
+  datePickerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 12, marginBottom: 16, backgroundColor: '#F9FAFB',
+  },
+  datePickerText: { flex: 1, fontSize: 14, color: '#111827' },
+  datePlaceholder: { color: '#9CA3AF' },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  optionBadge: {
-    width: 28, height: 28, borderRadius: 14, backgroundColor: '#EFF6FF',
-    justifyContent: 'center', alignItems: 'center',
-  },
+  optionBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' },
   optionBadgeText: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
   optionInput: {
     flex: 1, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827',
   },
   removeBtn: { padding: 4 },
-  addOptionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingVertical: 10, marginBottom: 8,
-  },
+  addOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, marginBottom: 8 },
   addOptionText: { fontSize: 14, color: '#2563EB', fontWeight: '600' },
-  createBtn: {
-    backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 10,
-    alignItems: 'center', marginTop: 8, marginBottom: 20,
-  },
+  createBtn: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 8, marginBottom: 20 },
   btnDisabled: { opacity: 0.6 },
   createBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
   resultsTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 4 },
   resultsMeta: { fontSize: 13, color: '#6B7280', marginBottom: 16 },
-  tabRow: {
-    flexDirection: 'row', backgroundColor: '#F3F4F6',
-    borderRadius: 8, padding: 4, marginBottom: 16,
-  },
+  tabRow: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 4, marginBottom: 16 },
   tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
   tabActive: { backgroundColor: 'white' },
   tabText: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
@@ -676,36 +811,22 @@ const styles = StyleSheet.create({
   optionResultCount: { fontSize: 13, color: '#6B7280' },
   barBg: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' },
   barFill: { height: 8, backgroundColor: '#2563EB', borderRadius: 4 },
-  voterRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
-  },
-  voterAvatar: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: '#EFF6FF',
-    justifyContent: 'center', alignItems: 'center',
-  },
+  voterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  voterAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' },
   voterAvatarText: { fontSize: 14, fontWeight: '700', color: '#2563EB' },
   voterInfo: { flex: 1 },
   voterName: { fontSize: 14, fontWeight: '600', color: '#111827' },
   voterChoice: { fontSize: 12, color: '#6B7280' },
   voterTime: { fontSize: 11, color: '#9CA3AF' },
   emptyText: { textAlign: 'center', color: '#9CA3AF', marginTop: 20 },
-  confirmBox: {
-  backgroundColor: '#fff', borderRadius: 16, padding: 24,
-  margin: 32, gap: 12,
-},
-confirmTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
-confirmMsg: { fontSize: 14, color: '#6B7280' },
-confirmBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
-confirmCancel: {
-  flex: 1, paddingVertical: 12, borderRadius: 8,
-  backgroundColor: '#F3F4F6', alignItems: 'center',
-},
-confirmCancelText: { fontWeight: '600', color: '#6B7280' },
-confirmDelete: {
-  flex: 1, paddingVertical: 12, borderRadius: 8,
-  backgroundColor: '#EF4444', alignItems: 'center',
-},
-confirmDeleteText: { fontWeight: '600', color: '#fff' },
-
+  confirmBox: { backgroundColor: '#fff', borderRadius: 16, padding: 24, margin: 32, gap: 12 },
+  confirmTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  confirmMsg: { fontSize: 14, color: '#6B7280' },
+  confirmBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  confirmCancel: { flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#F3F4F6', alignItems: 'center' },
+  confirmCancelText: { fontWeight: '600', color: '#6B7280' },
+  confirmDelete: { flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#EF4444', alignItems: 'center' },
+  confirmDeleteText: { fontWeight: '600', color: '#fff' },
+  dateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
+  clearDate: { padding: 4 },
 });
