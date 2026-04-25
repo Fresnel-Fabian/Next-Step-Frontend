@@ -36,6 +36,7 @@ interface Student {
 
 export default function StudentsScreen() {
   const [email, setEmail] = useState('');
+  const [search, setSearch] = useState('');
   const [students, setStudents] = useState<Student[]>([]);
   const [pendingInvites, setPendingInvites] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +46,11 @@ export default function StudentsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const filteredStudents = students.filter(s =>
+    s.name?.toLowerCase().includes(search.toLowerCase()) ||
+    s.email?.toLowerCase().includes(search.toLowerCase())
+  );
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -298,21 +304,40 @@ export default function StudentsScreen() {
         {/* Students List */}
         <View style={styles.card}>
           <View style={styles.listHeader}>
-            <Text style={styles.cardTitle}>All Students ({students.length})</Text>
+            <Text style={styles.cardTitle}>All Students ({filteredStudents.length})</Text>
             <Pressable onPress={fetchAll}>
               <Ionicons name="refresh-outline" size={18} color="#6B7280" />
             </Pressable>
           </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchRow}>
+            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search students..."
+              placeholderTextColor="#9CA3AF"
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </Pressable>
+            )}
+          </View>
+
           {loading ? (
             <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 24 }} />
-          ) : students.length === 0 ? (
+          ) : filteredStudents.length === 0 ? (
             <View style={styles.empty}>
-              <Ionicons name="school-outline" size={32} color="#D1D5DB" />
-              <Text style={styles.emptyText}>No students yet</Text>
+              <Ionicons name="search-outline" size={32} color="#D1D5DB" />
+              <Text style={styles.emptyText}>{search ? 'No students match your search' : 'No students yet'}</Text>
             </View>
           ) : (
             <FlatList
-              data={students}
+              data={filteredStudents}
               keyExtractor={item => item.id}
               renderItem={renderStudent}
               scrollEnabled={false}
@@ -406,6 +431,12 @@ const styles = StyleSheet.create({
   },
   csvBtnText: { fontSize: 14, fontWeight: '600', color: '#10B981' },
   listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#F9FAFB', borderRadius: 10, paddingHorizontal: 12,
+    paddingVertical: 10, borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 14, fontWeight: '700', color: '#2563EB' },

@@ -36,6 +36,7 @@ interface Teacher {
 
 export default function TeachersScreen() {
   const [email, setEmail] = useState('');
+  const [search, setSearch] = useState('');
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [pendingInvites, setPendingInvites] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +46,11 @@ export default function TeachersScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const filteredTeachers = teachers.filter(t =>
+    t.name?.toLowerCase().includes(search.toLowerCase()) ||
+    t.email?.toLowerCase().includes(search.toLowerCase())
+  );
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -298,21 +304,40 @@ export default function TeachersScreen() {
         {/* Teachers List */}
         <View style={styles.card}>
           <View style={styles.listHeader}>
-            <Text style={styles.cardTitle}>All Teachers ({teachers.length})</Text>
+            <Text style={styles.cardTitle}>All Teachers ({filteredTeachers.length})</Text>
             <Pressable onPress={fetchAll}>
               <Ionicons name="refresh-outline" size={18} color="#6B7280" />
             </Pressable>
           </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchRow}>
+            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search teachers..."
+              placeholderTextColor="#9CA3AF"
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </Pressable>
+            )}
+          </View>
+
           {loading ? (
             <ActivityIndicator size="small" color="#7C3AED" style={{ marginVertical: 24 }} />
-          ) : teachers.length === 0 ? (
+          ) : filteredTeachers.length === 0 ? (
             <View style={styles.empty}>
-              <Ionicons name="people-outline" size={32} color="#D1D5DB" />
-              <Text style={styles.emptyText}>No teachers yet</Text>
+              <Ionicons name="search-outline" size={32} color="#D1D5DB" />
+              <Text style={styles.emptyText}>{search ? 'No teachers match your search' : 'No teachers yet'}</Text>
             </View>
           ) : (
             <FlatList
-              data={teachers}
+              data={filteredTeachers}
               keyExtractor={item => item.id}
               renderItem={renderTeacher}
               scrollEnabled={false}
@@ -406,6 +431,12 @@ const styles = StyleSheet.create({
   },
   csvBtnText: { fontSize: 14, fontWeight: '600', color: '#10B981' },
   listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#F9FAFB', borderRadius: 10, paddingHorizontal: 12,
+    paddingVertical: 10, borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F3FF', justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 14, fontWeight: '700', color: '#7C3AED' },
