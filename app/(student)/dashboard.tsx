@@ -1,7 +1,8 @@
 import { ActivityItem } from '@/components/dashboard/ActivityItem';
 import { StatsCard } from '@/components/dashboard/StatsCard';
-import { ActivityLog, DataService, Poll, ScheduleDTO } from '@/services/dataService';
 import { useDashboardCompact } from '@/lib/dashboardResponsive';
+import api from '@/services/api';
+import { ActivityLog, DataService, Poll } from '@/services/dataService';
 import { useAuthStore } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -30,7 +31,9 @@ export default function StudentDashboard() {
   } = useDashboardCompact();
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [activePoll, setActivePoll] = useState<Poll | null>(null);
-  const [schedules, setSchedules] = useState<ScheduleDTO[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activePolls, setActivePolls] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [voting, setVoting] = useState(false);
@@ -43,14 +46,23 @@ export default function StudentDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [activityData, pollData, scheduleData] = await Promise.all([
+      const [activityData, pollData, eventsRes, notifsRes] = await Promise.all([
         DataService.getRecentActivity(),
         DataService.getPolls('active'),
-        DataService.getSchedules(),
+        api.get('/api/v1/schedule-events'),
+        api.get('/api/v1/notifications/unread-count'),
       ]);
+
       setActivities(activityData);
       setActivePoll(pollData.length > 0 ? pollData[0] : null);
-      setSchedules(scheduleData);
+      setActivePolls(pollData.length);
+
+      // Count upcoming events (today and future)
+      const today = new Date().toISOString().split('T')[0];
+      const upcoming = (eventsRes.data as any[]).filter(e => e.date >= today);
+      setUpcomingEvents(upcoming.length);
+
+      setUnreadCount(notifsRes.data.unreadCount || 0);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
@@ -100,7 +112,6 @@ export default function StudentDashboard() {
   const firstName = user?.name?.split(' ')[0] || 'Student';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-  const totalClasses = schedules.reduce((a, sch) => a + sch.classCount, 0);
 
   const contentPad = {
     paddingHorizontal: contentPaddingX,
@@ -115,23 +126,23 @@ export default function StudentDashboard() {
         style={isCompact ? styles.statPress : styles.statPressFlex}
       >
         <StatsCard
-          title="Classes"
-          value={totalClasses}
-          subtitle="Across your schedules"
+          title="Upcoming Classes"
+          value={upcomingEvents}
+          subtitle="From today onwards"
           icon="calendar-outline"
           color="#3B82F6"
           compact={isCompact}
         />
       </Pressable>
       <Pressable
-        onPress={() => router.push('/(student)/schedules')}
+        onPress={() => router.push('/(student)/polls')}
         style={isCompact ? styles.statPress : styles.statPressFlex}
       >
         <StatsCard
-          title="Schedules"
-          value={schedules.length}
-          subtitle="Active"
-          icon="today-outline"
+          title="Active Polls"
+          value={activePolls}
+          subtitle="Open for voting"
+          icon="bar-chart-outline"
           color="#10B981"
           compact={isCompact}
         />
@@ -141,9 +152,9 @@ export default function StudentDashboard() {
         style={isCompact ? styles.statPress : styles.statPressFlex}
       >
         <StatsCard
-          title="Updates"
-          value={activities.length}
-          subtitle="Recent items"
+          title="Unread"
+          value={unreadCount}
+          subtitle="Notifications"
           icon="notifications-outline"
           color="#8B5CF6"
           compact={isCompact}
@@ -180,7 +191,7 @@ export default function StudentDashboard() {
             </View>
             <View style={styles.actionText}>
               <Text style={styles.actionTitle}>Vote on Polls</Text>
-              <Text style={styles.actionSubtitle}>{activePoll ? '1 active poll' : 'No active polls'}</Text>
+              <Text style={styles.actionSubtitle}>{activePoll ? `${activePolls} active poll${activePolls !== 1 ? 's' : ''}` : 'No active polls'}</Text>
             </View>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -195,8 +206,8 @@ export default function StudentDashboard() {
               <Ionicons name="calendar" size={isCompact ? 22 : 24} color="#10B981" />
             </View>
             <View style={styles.actionText}>
-              <Text style={styles.actionTitle}>My Schedules</Text>
-              <Text style={styles.actionSubtitle}>{schedules.length} active</Text>
+              <Text style={styles.actionTitle}>My Schedule</Text>
+              <Text style={styles.actionSubtitle}>{upcomingEvents} upcoming class{upcomingEvents !== 1 ? 'es' : ''}</Text>
             </View>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -310,77 +321,34 @@ export default function StudentDashboard() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   headerTextBlock: { flex: 1, minWidth: 0 },
   greeting: { fontWeight: 'bold', color: '#111827', marginBottom: 6 },
   subGreeting: { color: '#6B7280' },
-
   statsGrid: {},
   statsStack: { gap: 12 },
   statRowThree: { flexDirection: 'row', gap: 12 },
   statPress: { width: '100%' },
   statPressFlex: { flex: 1, minWidth: 0 },
-
   quickColumn: {},
-
   actionCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', borderRadius: 14, borderWidth: 1,
+    borderColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
-  actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    flex: 1,
-    minWidth: 0,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  actionHeader: { flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 },
+  actionIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   actionText: { gap: 2, flex: 1, minWidth: 0 },
   actionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   actionSubtitle: { fontSize: 14, color: '#6B7280' },
-
   pollCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', borderRadius: 14, borderWidth: 1,
+    borderColor: '#F3F4F6', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
   pollHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  pollBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
+  pollBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
   pollBadgeText: { fontSize: 12, fontWeight: '700', color: '#059669' },
   seeAll: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
@@ -389,26 +357,11 @@ const styles = StyleSheet.create({
   pollDesc: { fontSize: 14, color: '#6B7280', marginBottom: 16, lineHeight: 20 },
   pollDescCompact: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
   pollOptions: { gap: 10, marginBottom: 16 },
-  pollOpt: {
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    overflow: 'hidden',
-  },
+  pollOpt: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, overflow: 'hidden' },
   pollOptSel: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   pollOptVoted: { borderColor: '#F3F4F6', backgroundColor: '#FAFAFA' },
   pollOptInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center' },
   radioSel: { borderColor: '#2563EB' },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#2563EB' },
   pollOptText: { flex: 1, fontSize: 15, color: '#374151', fontWeight: '500' },
@@ -419,50 +372,22 @@ const styles = StyleSheet.create({
   voteBtn: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
   voteBtnOff: { backgroundColor: '#93C5FD' },
   voteBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  votedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#ECFDF5',
-    padding: 12,
-    borderRadius: 10,
-  },
+  votedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 10 },
   votedText: { fontSize: 14, color: '#059669', fontWeight: '600', flex: 1 },
   votedTextCompact: { fontSize: 13 },
-
   emptyCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', borderRadius: 14, alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
   emptyCardTitle: { fontSize: 16, fontWeight: '700', color: '#374151' },
   emptyCardSub: { fontSize: 13, color: '#9CA3AF' },
-
   activityCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', borderRadius: 14, borderWidth: 1,
+    borderColor: '#F3F4F6', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
   },
-  activityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
+  activityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   activityTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   clearAllButton: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
   activityList: { gap: 0 },

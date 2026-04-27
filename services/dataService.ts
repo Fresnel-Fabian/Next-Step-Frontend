@@ -291,6 +291,18 @@ const mapDocument = (doc: RawDocumentItem): DocumentItem => ({
   url: doc.url,
 });
 
+export interface DashboardStats {
+  totalTeachers: number;
+  teachersTrend: string;
+  totalStudents: number;
+  studentsTrend: string;
+  activeSchedules: number;
+  schedulesTrend: string;
+  activePolls: number;
+  pollsTrend: string;
+  chartData: Array<{ name: string; active: number }>;
+}
+
 // ============================================
 // Data Service Class
 // ============================================
@@ -306,9 +318,8 @@ export class DataService {
       return {
         ...response.data,
         schedulesTrend: response.data.schedulesTrend || "Updated recently",
-        notificationsTrend: response.data.notificationsTrend || "this week",
         documentsTrend: response.data.documentsTrend || "added recently",
-        chartData: response.data.chartData || [],
+        chartData: [],
       };
     } catch (error) {
       throw handleApiError(error);
@@ -359,13 +370,14 @@ export class DataService {
     }
   }
 
-static async deleteAllActivity(): Promise<void> {
+  static async deleteAllActivity(): Promise<void> {
     try {
       await api.delete('/api/v1/dashboard/activity');
     } catch (error) {
       throw handleApiError(error);
     }
   }
+  
 
   // ========================================
   // Schedules
@@ -704,6 +716,8 @@ static async deleteAllActivity(): Promise<void> {
       throw handleApiError(error);
     }
   }
+
+  
 
   // ========================================
   // File Upload

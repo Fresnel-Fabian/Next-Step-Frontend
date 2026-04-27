@@ -29,6 +29,9 @@ export default function StaffDashboard() {
   } = useDashboardCompact();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [activePollsCount, setActivePollsCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,12 +41,33 @@ export default function StaffDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [statsData, activityData] = await Promise.all([
+      const [statsData, activityData, schedules, polls, notifications] = await Promise.all([
         DataService.getDashboardStats(),
         DataService.getRecentActivity(),
+        DataService.getSchedules().catch(() => []),
+        DataService.getPolls('active').catch(() => []),
+        DataService.getNotifications().catch(() => []),
       ]);
       setStats(statsData);
       setActivities(activityData);
+
+      // Upcoming classes — schedule events from today onwards
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const upcoming = (schedules || []).filter((s: any) => {
+        const dateStr = s.startDate || s.start_date || s.date;
+        if (!dateStr) return false;
+        const scheduleDate = new Date(dateStr);
+        return scheduleDate >= today;
+      });
+      setUpcomingCount(upcoming.length);
+
+      // Active polls
+      setActivePollsCount(polls?.length || 0);
+
+      // Unread notifications
+      const unread = (notifications || []).filter((n: any) => !n.isRead).length;
+      setUnreadCount(unread);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
       Toast.show({
@@ -120,6 +144,31 @@ export default function StaffDashboard() {
         )}
       </View>
 
+      {/* ✅ NEW: Three real stats row */}
+      <View style={[styles.statsRow, { marginBottom: sectionGap, gap: isCompact ? 8 : 12 }]}>
+        <View style={[styles.statCard, { padding: isCompact ? 12 : 16 }]}>
+          <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
+            <Ionicons name="calendar-outline" size={18} color="#10B981" />
+          </View>
+          <Text style={styles.statValue}>{upcomingCount}</Text>
+          <Text style={styles.statLabel}>Upcoming Classes</Text>
+        </View>
+        <View style={[styles.statCard, { padding: isCompact ? 12 : 16 }]}>
+          <View style={[styles.statIcon, { backgroundColor: '#FED7AA' }]}>
+            <Ionicons name="bar-chart-outline" size={18} color="#F59E0B" />
+          </View>
+          <Text style={styles.statValue}>{activePollsCount}</Text>
+          <Text style={styles.statLabel}>Active Polls</Text>
+        </View>
+        <View style={[styles.statCard, { padding: isCompact ? 12 : 16 }]}>
+          <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
+            <Ionicons name="notifications-outline" size={18} color="#2563EB" />
+          </View>
+          <Text style={styles.statValue}>{unreadCount}</Text>
+          <Text style={styles.statLabel}>Unread</Text>
+        </View>
+      </View>
+
       <View style={[styles.mainContent, { gap: isCompact ? 16 : 20 }]}>
         <View style={[styles.leftColumn, { gap: isCompact ? 16 : 20 }]}>
           <Pressable
@@ -154,29 +203,6 @@ export default function StaffDashboard() {
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </Pressable>
 
-          <View style={[styles.analyticsCard, { padding: cardPadding }]}>
-            <View style={styles.analyticsHeader}>
-              <View style={styles.actionHeader}>
-                <View style={[styles.actionIcon, { backgroundColor: '#FED7AA' }]}>
-                  <Ionicons name="bar-chart-outline" size={isCompact ? 22 : 24} color="#F59E0B" />
-                </View>
-                <View style={styles.actionText}>
-                  <Text style={styles.actionTitle}>Analytics</Text>
-                  <Text style={styles.actionSubtitle}>Activity overview</Text>
-                </View>
-              </View>
-            </View>
-
-            {stats.chartData && stats.chartData.length > 0 ? (
-              <View style={[styles.chartContainer, isCompact && styles.chartContainerCompact]}>
-                <Text style={{ color: '#9CA3AF' }}>Chart loaded</Text>
-              </View>
-            ) : (
-              <View style={[styles.chartContainer, isCompact && styles.chartContainerCompact]}>
-                <Text style={{ color: '#9CA3AF', marginTop: 40 }}>No chart data available</Text>
-              </View>
-            )}
-          </View>
         </View>
 
         <View style={[styles.activityCard, { padding: cardPadding }]}>
@@ -253,6 +279,39 @@ const styles = StyleSheet.create({
   logoutButton: {
     padding: 8,
   },
+  // ✅ NEW stats row styles
+  statsRow: {
+    flexDirection: 'row',
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    gap: 8,
+  },
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
   mainContent: {
     gap: 20,
   },
@@ -300,30 +359,6 @@ const styles = StyleSheet.create({
   actionSubtitle: {
     fontSize: 14,
     color: '#6B7280',
-  },
-  analyticsCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  analyticsHeader: {
-    marginBottom: 20,
-  },
-  chartContainer: {
-    height: 180,
-    marginTop: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chartContainerCompact: {
-    height: 140,
-    marginTop: 4,
   },
   activityCard: {
     backgroundColor: 'white',
