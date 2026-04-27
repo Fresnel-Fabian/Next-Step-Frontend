@@ -640,6 +640,17 @@ static async deleteAllActivity(): Promise<void> {
     }
   }
 
+  static async updatePollExpiry(pollId: number | string, expiresAt: Date): Promise<void> {
+  try {
+    const id = DataService.toPollId(pollId);
+    await api.patch(`/api/v1/polls/${id}/expiry`, {
+      expires_at: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
   static async deletePoll(pollId: number | string): Promise<void> {
     try {
       const id = DataService.toPollId(pollId);
@@ -740,6 +751,8 @@ static async deleteAllActivity(): Promise<void> {
   }
 }
 
+
+
   // ========================================
   // Notifications
   // ========================================
@@ -820,7 +833,17 @@ static async deleteAllActivity(): Promise<void> {
       throw handleApiError(error);
     }
   }
+  
+  static async getAnnouncementAttachments(): Promise<any[]> {
+  try {
+    const res = await api.get('/api/v1/documents/announcement-attachments');
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 }
+}
+
 
 
 export default DataService;

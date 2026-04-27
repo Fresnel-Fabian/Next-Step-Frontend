@@ -20,22 +20,23 @@ export default function RootLayout() {
     const inAdminGroup = segments[0] === '(admin)';
     const inStaffGroup = segments[0] === '(staff)';
     const inStudentGroup = segments[0] === '(student)';
+    const onInvitePage = segments[0] === 'invite'; // allow invite page without login
 
     if (!user) {
-      // Not logged in → always go to login
-      if (!inAuthGroup) {
+      if (!inAuthGroup && !onInvitePage) {
         router.replace('/(auth)/login');
       }
       return;
     }
 
     // User is logged in — redirect to correct group if in wrong place
+    if (onInvitePage) return; // don't redirect away from invite even if logged in
+
     if (user.role === UserRole.ADMIN) {
       if (!inAdminGroup) router.replace('/(admin)/dashboard');
     } else if (user.role === UserRole.TEACHER) {
       if (!inStaffGroup) router.replace('/(staff)/dashboard');
     } else {
-      // STUDENT
       if (!inStudentGroup) router.replace('/(student)/dashboard');
     }
   }, [user, segments, isLoading]);
@@ -51,6 +52,7 @@ export default function RootLayout() {
         <Stack.Screen name="(admin)" />
         <Stack.Screen name="(staff)" />
         <Stack.Screen name="(student)" />
+        <Stack.Screen name="invite" />
       </Stack>
       <Toast />
     </SafeAreaProvider>

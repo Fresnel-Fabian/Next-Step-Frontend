@@ -44,6 +44,20 @@ const NAV_ITEMS: RoleNavItem[] = [
     route: '/(admin)/notification',
   },
   {
+    segment: 'students',
+    label: 'Students',
+    tabShort: 'Students',
+    icon: 'school-outline',
+    route: '/(admin)/students',
+  },
+  {
+    segment: 'teachers',
+    label: 'Teachers',
+    tabShort: 'Teachers',
+    icon: 'people-outline',
+    route: '/(admin)/teachers',
+  },
+  {
     segment: 'settings',
     label: 'Settings',
     tabShort: 'Settings',
