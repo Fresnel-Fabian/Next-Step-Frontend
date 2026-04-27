@@ -1,7 +1,7 @@
 import { ActivityItem } from '@/components/dashboard/ActivityItem';
 import { StatsCard } from '@/components/dashboard/StatsCard';
-import { ActivityLog, DashboardStats, DataService } from '@/services/dataService';
 import { useDashboardCompact } from '@/lib/dashboardResponsive';
+import { ActivityLog, DashboardStats, DataService } from '@/services/dataService';
 import { useAuthStore } from '@/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -107,35 +107,6 @@ export default function AdminDashboard() {
     );
   }
 
-  const statNodes = (
-    <>
-      <StatsCard
-        title="Active Schedules"
-        value={stats.activeSchedules}
-        subtitle={stats.schedulesTrend}
-        icon="calendar-outline"
-        color="#10B981"
-        compact={isCompact}
-      />
-      <StatsCard
-        title="Notifications Sent"
-        value={stats.notificationsSent}
-        subtitle={stats.notificationsTrend}
-        icon="notifications-outline"
-        color="#8B5CF6"
-        compact={isCompact}
-      />
-      <StatsCard
-        title="Documents"
-        value={stats.totalDocuments}
-        subtitle={stats.documentsTrend}
-        icon="document-text-outline"
-        color="#F59E0B"
-        compact={isCompact}
-      />
-    </>
-  );
-
   const contentPad = {
     paddingHorizontal: contentPaddingX,
     paddingVertical: contentPaddingY,
@@ -144,6 +115,7 @@ export default function AdminDashboard() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={contentPad}>
+      {/* Header */}
       <View style={[styles.header, { marginBottom: sectionGap }]}>
         <View style={isCompact ? styles.headerTextBlock : undefined}>
           <Text style={[styles.greeting, { fontSize: greetingFontSize }]}>Admin Dashboard</Text>
@@ -153,278 +125,96 @@ export default function AdminDashboard() {
         </View>
       </View>
 
+      {/* Stats Grid */}
       <View style={[styles.statsGrid, { marginBottom: sectionGap }]}>
         {isCompact ? (
-          <View style={styles.statsStack}>{statNodes}</View>
+          <View style={styles.statsStack}>
+            <StatsCard title="Teachers" value={stats.totalTeachers} subtitle={stats.teachersTrend} icon="people-outline" color="#7C3AED" compact />
+            <StatsCard title="Students" value={stats.totalStudents} subtitle={stats.studentsTrend} icon="school-outline" color="#2563EB" compact />
+            <StatsCard title="Active Schedules" value={stats.activeSchedules} subtitle={stats.schedulesTrend} icon="calendar-outline" color="#10B981" compact />
+            <StatsCard title="Active Polls" value={stats.activePolls} subtitle={stats.pollsTrend} icon="bar-chart-outline" color="#F59E0B" compact />
+          </View>
         ) : (
           <>
             <View style={styles.statRow}>
               <View style={styles.statHalf}>
-                <StatsCard
-                  title="Total Staff"
-                  value={stats.totalStaff}
-                  subtitle={stats.staffTrend}
-                  icon="people-outline"
-                  color="#3B82F6"
-                />
+                <StatsCard title="Teachers" value={stats.totalTeachers} subtitle={stats.teachersTrend} icon="people-outline" color="#7C3AED" />
               </View>
               <View style={styles.statHalf}>
-                <StatsCard
-                  title="Active Schedules"
-                  value={stats.activeSchedules}
-                  subtitle={stats.schedulesTrend}
-                  icon="calendar-outline"
-                  color="#10B981"
-                />
+                <StatsCard title="Students" value={stats.totalStudents} subtitle={stats.studentsTrend} icon="school-outline" color="#2563EB" />
               </View>
             </View>
             <View style={styles.statRow}>
               <View style={styles.statHalf}>
-                <StatsCard
-                  title="Notifications Sent"
-                  value={stats.notificationsSent}
-                  subtitle={stats.notificationsTrend}
-                  icon="notifications-outline"
-                  color="#8B5CF6"
-                />
+                <StatsCard title="Active Schedules" value={stats.activeSchedules} subtitle={stats.schedulesTrend} icon="calendar-outline" color="#10B981" />
               </View>
               <View style={styles.statHalf}>
-                <StatsCard
-                  title="Documents"
-                  value={stats.totalDocuments}
-                  subtitle={stats.documentsTrend}
-                  icon="document-text-outline"
-                  color="#F59E0B"
-                />
+                <StatsCard title="Active Polls" value={stats.activePolls} subtitle={stats.pollsTrend} icon="bar-chart-outline" color="#F59E0B" />
               </View>
             </View>
           </>
         )}
       </View>
 
-      <View style={[styles.mainContent, { gap: isCompact ? 16 : 20 }]}>
-        <View style={[styles.leftColumn, { gap: isCompact ? 16 : 20 }]}>
-          <Pressable style={[styles.actionCard, { padding: cardPadding }]}>
-            <View style={styles.actionHeader}>
-              <View style={[styles.actionIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="document-text" size={isCompact ? 22 : 24} color="#10B981" />
-              </View>
-              <View style={styles.actionText}>
-                <Text style={styles.actionTitle}>Documents</Text>
-                <Text style={styles.actionSubtitle}>48 files pending review</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </Pressable>
-
-          <View style={[styles.analyticsCard, { padding: cardPadding }]}>
-            <View style={styles.analyticsHeader}>
-              <View style={styles.actionHeader}>
-                <View style={[styles.actionIcon, { backgroundColor: '#FED7AA' }]}>
-                  <Ionicons name="bar-chart" size={isCompact ? 22 : 24} color="#F59E0B" />
-                </View>
-                <View style={styles.actionText}>
-                  <Text style={styles.actionTitle}>Analytics</Text>
-                  <Text style={styles.actionSubtitle}>Activity stats</Text>
-                </View>
-              </View>
-            </View>
-
-            {stats.chartData && stats.chartData.length > 0 ? (
-              <View style={[styles.chartContainer, isCompact && styles.chartContainerCompact]}>
-                <Text style={{ color: '#9CA3AF' }}>Chart loaded</Text>
-              </View>
-            ) : (
-              <View style={[styles.chartContainer, isCompact && styles.chartContainerCompact]}>
-                <Text style={{ color: '#9CA3AF', marginTop: 40 }}>No chart data available</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={[styles.activityCard, { padding: cardPadding }]}>
-          <View style={styles.activityHeader}>
-            <Text style={styles.activityTitle}>Recent Activity</Text>
-            {activities.length > 0 && (
-              <Pressable onPress={handleClearAll}>
-                <Text style={styles.clearAllButton}>Clear All</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {activities.length === 0 ? (
-            <View style={styles.emptyActivity}>
-              <Ionicons name="checkmark-circle-outline" size={32} color="#D1D5DB" />
-              <Text style={styles.emptyActivityText}>No recent activity</Text>
-            </View>
-          ) : (
-            <View style={styles.activityList}>
-              {activities.map((activity) => (
-                <View key={activity.id} style={styles.activityRow}>
-                  <View style={styles.activityItemContainer}>
-                    <ActivityItem
-                      title={activity.title}
-                      author={activity.author}
-                      timestamp={activity.timestamp}
-                    />
-                  </View>
-                  <Pressable
-                    onPress={() => handleDismissActivity(activity.id)}
-                    style={styles.dismissBtn}
-                  >
-                    <Ionicons name="close" size={16} color="#9CA3AF" />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
+      {/* Recent Activity */}
+      <View style={[styles.activityCard, { padding: cardPadding }]}>
+        <View style={styles.activityHeader}>
+          <Text style={styles.activityTitle}>Recent Activity</Text>
+          {activities.length > 0 && (
+            <Pressable onPress={handleClearAll}>
+              <Text style={styles.clearAllButton}>Clear All</Text>
+            </Pressable>
           )}
         </View>
+
+        {activities.length === 0 ? (
+          <View style={styles.emptyActivity}>
+            <Ionicons name="checkmark-circle-outline" size={32} color="#D1D5DB" />
+            <Text style={styles.emptyActivityText}>No recent activity</Text>
+          </View>
+        ) : (
+          <View style={styles.activityList}>
+            {activities.map((activity) => (
+              <View key={activity.id} style={styles.activityRow}>
+                <View style={styles.activityItemContainer}>
+                  <ActivityItem
+                    title={activity.title}
+                    author={activity.author}
+                    timestamp={activity.timestamp}
+                  />
+                </View>
+                <Pressable onPress={() => handleDismissActivity(activity.id)} style={styles.dismissBtn}>
+                  <Ionicons name="close" size={16} color="#9CA3AF" />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  headerTextBlock: {
-    flex: 1,
-    minWidth: 0,
-  },
-  greeting: {
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 6,
-  },
-  subGreeting: {
-    color: '#6B7280',
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerTextBlock: { flex: 1, minWidth: 0 },
+  greeting: { fontWeight: 'bold', color: '#111827', marginBottom: 6 },
+  subGreeting: { color: '#6B7280' },
   statsGrid: {},
-  statsStack: {
-    gap: 12,
-  },
-  statRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  statHalf: {
-    flex: 1,
-  },
-  statFull: {
-    flex: 1,
-    width: '100%',
-  },
-  mainContent: {
-    gap: 20,
-  },
-  leftColumn: {
-    gap: 20,
-  },
-  actionCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    flex: 1,
-    minWidth: 0,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionText: {
-    gap: 2,
-    flex: 1,
-    minWidth: 0,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  actionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  analyticsCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  analyticsHeader: {
-    marginBottom: 20,
-  },
-  chartContainer: {
-    height: 180,
-    marginTop: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chartContainerCompact: {
-    height: 140,
-    marginTop: 4,
-  },
+  statsStack: { gap: 12 },
+  statRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
+  statHalf: { flex: 1 },
   activityCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: 'white', borderRadius: 14, borderWidth: 1,
+    borderColor: '#F3F4F6', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05,
+    shadowRadius: 2, elevation: 2,
   },
-  activityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  activityTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  activityList: {
-    gap: 0,
-  },
+  activityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  activityTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  activityList: { gap: 0 },
   clearAllButton: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
   activityRow: { flexDirection: 'row', alignItems: 'center' },
   activityItemContainer: { flex: 1 },
